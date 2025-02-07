@@ -1,0 +1,3907 @@
+---
+title: "Grouping N. subflava and N. mucosa genomes based on ANI and Phylogenomics"
+author: "J. J. Giacomini"
+date: "2025-02-07"
+output: html_document
+---
+
+In our study, we adopted a comprehensive approach that encompasses both genome similarity and environmental adaptation to group N. subflava genomes. This was achieved through the utilization of Average Nucleotide Identity (ANI) and a pangenomic analysis for assessing genome similarity, alongside hierarchical clustering informed by metagenomic breadth of coverage (BoC) derived from mapping analysis to gauge environmental adaptation. To elucidate the relationship and consistency between the genomic similarity (as measured by ANI and pangenome gene clustering) and ecological adaptation (inferred from the BoC), we constructed multiple tanglegrams: one comparing the ANI-based hierarchical clustering tree with the BoC similarity tree and another comparing the pangenome-based gene-cluster similarity tree with the BoC similarity tree. The comparison between the ANI and BoC trees revealed four distinct, congruent groups across the N. subflava genomes, demonstrating slight intra-group rearrangements while preserving the overall group integrity. The comparison between the Pangenome and BoC trees revealed only two congruent groups across the N. subflava genomes, albeit with a notable exception for a single genome. The two congruent groups from the Pangenome vs. BoC comparison align with the broader four-group classification from the ANI vs. BoC comparison. We thus, adopted a two-group framework for grouping N. subflava genomes, favoring a model that encapsulates the core genomic and ecological distinctions within the N. subflava population, while also acknowledging the complexity and diversity revealed by our analyses.
+
+
+We employed a multifaceted approach to group N. subflava genomes by utilizing Average Nucleotide Identity (ANI), a pangenomic analysis of gene cluster sharing, and hierarchical clustering informed by metagenomic breadth of coverage (BoC) derived from the mapping analysis. To elucidate the relationship and consistency between the genomic similarity (as measured by ANI and pangenome gene clustering) and ecological adaptation (inferred from the BoC), we constructed tanglegrams comparing the ANI-based hierarchical clustering tree and the pangenome-based gene-cluster similarity tree with the BoC similarity tree. The comparison between the ANI and BoC trees revealed four distinct, congruent groups across the N. subflava genomes, demonstrating slight intra-group rearrangements while preserving the overall group integrity. The comparison between the Pangenome and BoC trees revealed only two congruent groups across the N. subflava genomes, albeit with a notable exception for a single genome. The two congruent groups from the Pangenome vs. BoC comparison align with the broader four-group classification from the ANI vs. BoC comparison. We thus, adopted a two-group framework for grouping N. subflava genomes, favoring a model that encapsulates the core genomic and ecological distinctions within the N. subflava population, while also acknowledging the complexity and diversity revealed by our analyses.
+
+
+
+##### 8.1. Subflava genomes
+
+###### 8.1.i. ANI
+
+```{r}
+
+
+# packages
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(phytools)
+library(tibble)
+library(dendextend)
+library(ape)
+library(dplyr)
+library(ggdendro)
+
+# load ANI data
+df <-read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_percentage_identity.txt", header = TRUE)
+
+# load ANI tree
+df_newick <-  ape::read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_percentage_identity.newick")
+
+# order ANI data by ANI tree
+df_newick_orders <- phytools::compute.mr(df_newick, type = "matrix")
+df_newick_rownames <- rev(rownames(df_newick_orders))
+data_ordered <- df[ order(match(df$key, df_newick_rownames)), ]
+df_newick_rownames_df <- as.data.frame(df_newick_rownames)
+cols_A<- ncol(df) -1
+df_newick_rownames_df2 <- as.data.frame(matrix(df_newick_rownames_df$df_newick_rownames, ncol = cols_A, byrow = TRUE))
+names(df_newick_rownames_df2) <- df_newick_rownames_df2[1,]
+df_newick_rownames_df3 <- df_newick_rownames_df2[-1,]
+df_newick_rownames_df3 <- df_newick_rownames_df3 %>% 
+  add_column(key = NA, .before = 1)
+data_ordered2<-data_ordered[names(df_newick_rownames_df3)]
+
+cols2<- ncol(data_ordered2) 
+long_df <- reshape2::melt(data_ordered2,
+                          id.vars=c("key"),
+                          measure.vars=colnames(data_ordered2[2:cols2]),
+                          variable.name="y",
+                          value.name="z")
+mylevels1 <- df_newick$tip.label
+long_df$key <- factor(long_df$key,levels=mylevels1)
+long_df$y <- factor(long_df$y, levels=mylevels1)
+
+
+# Subflava group
+Subflava_group <- long_df$key[160:213]
+
+# Subset data frame
+long_df_Subflava_group <- long_df %>% 
+  filter(key %in% Subflava_group) %>% 
+  filter(y %in% Subflava_group)
+
+
+# Density plot
+ggplot(long_df_Subflava_group, aes(x = z)) + 
+  geom_density(fill = "blue", alpha = 0.5, adjust = 0.01) +  # Add the density plot
+  geom_rug(color = "red") +  # Add rug plot with points along the x-axis
+  ggtitle("Density of Z Values with Data Points") +
+  xlab("Z Values") +
+  ylab("Density") +
+  geom_vline(xintercept = 0.95, linetype = "dashed", color = "red")
+
+# Histogram
+# Add a new column to the data frame categorizing the 'z' values
+long_df_Subflava_group$color_group <- ifelse(long_df_Subflava_group$z < 0.95, "< 0.95", ">= 0.95")
+
+# Create the histogram for the 'z' variable with conditional coloring
+ggplot(long_df_Subflava_group, aes(x = z, fill = color_group)) + 
+  geom_histogram(binwidth = 0.001, color = "black", linewidth = 0.5) + 
+  scale_fill_manual(values = c("< 0.95" = "blue", ">= 0.95" = "red")) +
+  ggtitle("Histogram of ANI Values (binwidth = 0.001 )") +
+  xlab("ANI Values") +
+  ylab("Count") +
+  theme_minimal() +  # Optional: Adds a minimalistic theme to the plot
+  geom_vline(xintercept = 0.95, linetype = "dashed", color = "black") + 
+  geom_rug(color = "black", alpha = 0.5)  # Add rug plot with points along the x-axis
+
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_ANI_histogram.pdf", plot = last_plot(), width = 5, height = 3)
+
+
+#### PLOT ####
+# get tick colors
+
+# import colors df
+# load csv file with genome IDs and colors; theis file was made when the tanglegram was made
+bins_and_colors <-read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/pangenome_custom_gene_freq_order.csv", header = TRUE)
+
+# Ensure 'Pangenome_ID' and 'key' are factors
+bins_and_colors$Pangenome_ID <- as.factor(bins_and_colors$Pangenome_ID)
+
+# Match the order of 'Pangenome_ID' in bins_and_colors to the order in 'key' of long_df
+order_indices <- match(long_df_Subflava_group$key, bins_and_colors$Pangenome_ID)
+
+# Use the order_indices to reorder bins_and_colors
+bins_and_colors_reordered <- bins_and_colors[order_indices, ]
+
+
+group_tick_colors <- bins_and_colors_reordered$Group_color
+
+
+# plot
+ANI_plot<-ggplot(long_df_Subflava_group, aes(key,y)) +
+  geom_tile(aes(fill = z)) + 
+  scale_fill_gradient2(low = "darkblue",
+                       mid = "white",
+                       high = "darkred",
+                       midpoint = 0.95,
+                       limits =c(0.9, 1),
+                       na.value="darkblue",
+                       name = "ANI (%)")+
+  #geom_text(aes(label = format(round(z, digits=3), nsmall = 3)),size=2.75) +
+  ylab("") +  
+  xlab("") + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, color = "black", size = 2),
+        axis.text.y = element_text(color = "black", size = 2),
+        axis.ticks.y = element_line(color = rev(group_tick_colors), size = 1),
+        axis.ticks.x = element_line(color = rev(group_tick_colors), size = 1.3),
+        axis.ticks.length=unit(.5, "cm")) 
+
+
+#ggsave(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANI_heatmap.pdf", plot = plot, width = 11, height = 8, limitsize = FALSE)
+
+
+################ Graph ################ ################ ################ ################ ################ ################ ################
+library(igraph)
+
+# Step 1: Filter pairs with ANI >= 95%
+high_ani_pairs <- subset(long_df_Subflava_group, z >= 0.9558)
+
+# Step 2: Create a graph from the high-ani pairs
+g <- graph_from_data_frame(high_ani_pairs[, c("key", "y")], directed = FALSE)
+
+# Plot the graph
+plot(g,
+     vertex.label = NA, # Hides the node labels for clarity; remove NA to show labels
+     vertex.size = 5, # Adjusts the size of the nodes
+     edge.arrow.size = 0.5, # Relevant for directed graphs; adjust arrow size
+     layout = layout_with_fr(g) # Uses the Fruchterman-Reingold layout
+)
+
+# Step 3: Identify connected components
+graph_groups <- components(g)$membership
+
+# Add the group information back to the data frame
+long_df_Subflava_group$graph_groups <- graph_groups[as.character(long_df_Subflava_group$key)]
+
+
+# print lists of the three groups
+Subflava_group_4 <- long_df_Subflava_group %>% 
+  filter(graph_groups == "4") %>% 
+  dplyr::select(key) %>% 
+  distinct()
+
+Subflava_group_3 <- long_df_Subflava_group %>% 
+  filter(graph_groups == "3") %>% 
+  dplyr::select(key) %>% 
+  distinct()
+
+Subflava_group_2 <- long_df_Subflava_group %>% 
+  filter(graph_groups == "2") %>% 
+  dplyr::select(key) %>% 
+  distinct()
+
+Subflava_group_1 <- long_df_Subflava_group %>% 
+  filter(graph_groups == "1") %>% 
+  dplyr::select(key) %>% 
+  distinct()
+
+
+################ ################ ################ ################ ################ ################ ################ 
+
+# Hclust based on euclidian distances and ward linkage
+
+# Convert to wide format
+wide_df_Subflava_group <- long_df_Subflava_group %>% 
+  dplyr::select(key, y, z) %>% 
+  pivot_wider(names_from = key, values_from = z)
+
+
+# Convert tibble to data frame object
+wide_df_Subflava_group_df <- as.data.frame(wide_df_Subflava_group)
+
+# Rename row names to species IDs
+wide_df_Subflava_group_df2 <- wide_df_Subflava_group_df[,-1]
+rownames(wide_df_Subflava_group_df2) <- wide_df_Subflava_group_df[,1]
+
+# Reformat to matrix
+Subflava_group_matrix <- as.matrix(wide_df_Subflava_group_df2)
+
+
+# Calculate Euclidean distance among genomes
+Subflava_group_distances <- vegan::vegdist(Subflava_group_matrix, method = "euclidian")
+
+
+# Hierarchical clustering using Ward Linkage
+Subflava_group_hc <- hclust(Subflava_group_distances, method = "ward.D" )
+
+# Save Subflava ANI tree
+Subflava_group_ANI_HC_Euclidean_distances_tree <- as.phylo(Subflava_group_hc) 
+write.tree(Subflava_group_ANI_HC_Euclidean_distances_tree, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_ANI_HC_Euclidean_distances.newick") # look for the file in your working directory
+
+
+# Plot HC tree
+plot(Subflava_group_hc)
+
+
+# Get groups based on height or k
+Subflava_groups <- cutree(Subflava_group_hc, k = 6)
+#Subflava_groups <- cutree(Subflava_group_hc, h = 0.2)
+
+# Add the group information back to the data frame
+#long_df_Subflava_group$HC_height_0_2_groups <- Subflava_groups[as.character(long_df_Subflava_group$key)]
+long_df_Subflava_group$HC_k6_groups <- Subflava_groups[as.character(long_df_Subflava_group$key)]
+
+# Get lists of groups
+Subflava_group_6 <- long_df_Subflava_group %>% 
+  filter(HC_k6_groups == "6") %>% 
+  dplyr::select(key) %>% 
+  distinct()
+
+Subflava_group_5 <- long_df_Subflava_group %>% 
+  filter(HC_k6_groups == "5") %>% 
+  dplyr::select(key) %>% 
+  distinct()
+
+Subflava_group_4 <- long_df_Subflava_group %>% 
+  filter(HC_k6_groups == "4") %>% 
+  dplyr::select(key) %>% 
+  distinct()
+
+Subflava_group_3 <- long_df_Subflava_group %>% 
+  filter(HC_k6_groups == "3") %>% 
+  dplyr::select(key) %>% 
+  distinct()
+
+Subflava_group_2 <- long_df_Subflava_group %>% 
+  filter(HC_k6_groups == "2") %>% 
+  dplyr::select(key) %>% 
+  distinct()
+
+Subflava_group_1 <- long_df_Subflava_group %>% 
+  filter(HC_k6_groups == "1") %>% 
+  dplyr::select(key) %>% 
+  distinct()
+```
+
+
+###### 8.1.i.1. Add BoC heatmap
+```{r}
+
+Breadth_df <- read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Strain_level_updated_detection_data.csv", header = TRUE)
+
+# filter for subflava group genomes
+Subflava_group_Breadth_df <- Breadth_df %>% 
+  filter(bins %in% Subflava_group) 
+
+Subflava_group_Breadth_df$bins <- as.factor(Subflava_group_Breadth_df$bins)
+
+# Order based on hclust of ANI results
+Subflava_group_hc_order <- data.frame(order = Subflava_group_hc$labels[Subflava_group_hc$order])
+Subflava_group_Breadth_df$bins <- factor(Subflava_group_Breadth_df$bins, levels = Subflava_group_hc_order$order)
+
+
+# specify order for site terms
+Subflava_group_Breadth_df$site <- factor(Subflava_group_Breadth_df$site, levels = c("SUPP", "SUBP", "KG", "BM", "TD", "PT", "HP", "TH", "SV"))
+
+
+```
+
+Make N. subflava group heatmap where samples within sites are ordered based on total number of reads.
+
+###### 8.1.i.2. plot
+
+```{r}
+
+# set colors for heat map
+paleta_new = rev(RColorBrewer::brewer.pal(n = 11, name = "RdYlBu"))
+
+# Colors, including gray for the first segment
+colors <- c("gray", paleta_new)
+
+# Set up bar positioning for plots
+dodge <- position_dodge(width=0.9)
+
+# total_reads_mapped_plot
+total_reads_mapped_plot <- ggplot(data = Subflava_group_Breadth_df, aes(x=reorder(layers, -total_number_reads), y=total_reads_mapped)) + 
+  geom_bar(stat = 'identity',position = dodge, color = "darkblue") +
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") +
+  scale_y_continuous(expand = c(0, 0), limits=c(0, 25000000), breaks=seq(0,25000000,by=25000000), oob=squish, labels = scales::comma) +
+  #coord_cartesian(ylim=c(0,100000000)) +
+  xlab(NULL)+
+  ylab(expression(atop("No. of reads mapped", "(0 - 25 million)"))) +  # Modified y-axis label
+  theme_classic() + 
+  theme(text = element_text(size = 8),
+        axis.ticks.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(angle = -270, vjust = 0.5, hjust = 0.5),  # Try -90 degrees rotation
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "lightblue")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,-0.001,1), "cm"))+
+  force_panelsizes(cols = unit(c(8,4,4,8,8,4,1.5,4,2), "cm"), 
+                 TRUE)
+
+# total_reads_plot
+total_reads_plot <- ggplot(data = Subflava_group_Breadth_df, aes(x=reorder(layers, -total_number_reads), y=total_number_reads)) + 
+  geom_bar(stat = 'identity',position = dodge, color = "darkblue") +
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") +
+  scale_y_continuous(expand = c(0, 0), limits=c(0, 200000000), breaks=seq(0,200000000,by=200000000), oob=squish, labels = scales::comma) +
+  #coord_cartesian(ylim=c(0,100000000)) +
+  xlab(NULL)+
+  ylab(expression(atop("Total reads", "(0 - 200 million)"))) +  # Modified y-axis label
+  theme_classic() + 
+  theme(text = element_text(size = 8),
+        axis.ticks.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x = element_blank(),
+        axis.text.y=element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(angle = -270, vjust = 0.5, hjust = 0.5),  # Try -90 degrees rotation
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "lightblue")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,-0.001,1), "cm"))+
+  force_panelsizes(cols = unit(c(8,4,4,8,8,4,1.5,4,2), "cm"), 
+                 TRUE)
+
+# percent_reads_mapped_plot
+percent_reads_mapped_plot <- ggplot(data = Subflava_group_Breadth_df, aes(x=reorder(layers, -total_number_reads), y=percent_reads_mapped)) + 
+  geom_bar(stat = 'identity',position = dodge, color = "darkblue") +
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") +
+  scale_y_continuous(expand = c(0, 0), limits=c(0, 50), breaks=seq(0,50,by=50), oob=squish, labels = scales::comma) +
+  #coord_cartesian(ylim=c(0,100000000)) +
+  xlab(NULL)+
+  ylab(expression(atop("Percent reads mapped", "(0 - 50 %)"))) +  # Modified y-axis label
+  theme_classic() + 
+  theme(text = element_text(size = 8),
+        axis.ticks.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(angle = -270, vjust = 0.5, hjust = 0.5),  # Try -90 degrees rotation
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "lightblue")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,-0.001,1), "cm"))+
+  force_panelsizes(cols = unit(c(8,4,4,8,8,4,1.5,4,2), "cm"), 
+                 TRUE)
+
+# Breadth heatmap
+Subflava_group_breadth_heatmap <- ggplot(data = Subflava_group_Breadth_df, aes(x=reorder(layers,-total_number_reads), y=bins, fill=value)) +
+  geom_tile(height=1, width=1) + 
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") + 
+  scale_fill_gradientn(colours = colors,
+                       limits=c(0.005, 0.5),
+                       #breaks=seq(0.005,0.5,by=0.1),
+                       breaks = c(0.5, 0.4, 0.3, 0.2, 0.1, 0.005),
+                       labels = c("> 50 %", "40 %", "30 %", "20 %", "10 %", "< 0.5 %"),
+                       oob=squish) +
+  # scale_fill_gradientn(colours = colors,
+  #                      limits=c(0.005, 1),
+  #                      #breaks=seq(0.005,0.5,by=0.1),
+  #                      breaks = c(1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.005),
+  #                      labels = c("100 %","90 %","80 %","70 %","60 %","50 %", "40 %", "30 %", "20 %", "10 %", "< 0.5 %"),
+  #                      oob=squish) + 
+  scale_y_discrete(limits = rev(levels(Subflava_group_Breadth_df$bins))) +
+  ylab(NULL) +  
+  xlab(NULL) + 
+  theme_classic() + 
+  guides(fill = guide_colourbar(barwidth = 1,
+                                barheight = 10,
+                                title = "Breadth of coverage",
+                                ticks = TRUE,
+                                ticks.colour = "white",
+                                ticks.linewidth = 0.5)) +
+  theme(text = element_text(size = 12),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y =  element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "black")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text=element_text(size=12)) + 
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,1,1), "cm")) +
+  force_panelsizes(cols = unit(c(8,4,4,8,8,4,1.5,4,2), "cm"), 
+                 TRUE)
+
+
+# plot ANI dendrogram 
+plot(dendro_data(as.dendrogram(Subflava_group_hc)),type = "rectangle")
+
+dend_ob <- dendro_data(as.dendrogram(Subflava_group_hc),type = "rectangle")
+
+Subflava_group_ANI_dendrogram <- ggplot(segment(dend_ob)) + 
+         geom_segment(aes(x = x, y = y, xend = xend, yend = yend), linewidth = 1) + 
+         coord_flip() + 
+         scale_y_reverse(expand = c(0.2, 0)) +
+         scale_x_reverse() +
+         theme_classic() +
+         theme(axis.ticks.y = element_blank(),
+               axis.ticks.x=element_blank(),
+               axis.text.x = element_blank(),
+               axis.text.y =  element_blank(),
+               axis.line.x = element_blank(),
+               axis.line.y = element_blank(),
+               axis.title.y = element_blank(),
+               axis.title.x = element_blank()) +
+         theme(panel.spacing.x=unit(0.1, "lines"),
+               plot.margin=unit(c(0,0,0,0), "cm"))
+  
+# save dend plot
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Subflava_group_ANI_dendrogram.pdf",Subflava_group_ANI_dendrogram, width = 5, height = 7)
+  
+
+
+# Combine Breadth heatmap with ANI heatmap and dedrogram
+
+long_df_Subflava_group$key <- as.factor(long_df_Subflava_group$key)
+
+# Order based on hclust of ANI results
+Subflava_group_hc_order <- data.frame(order = Subflava_group_hc$labels[Subflava_group_hc$order])
+long_df_Subflava_group$key <- factor(long_df_Subflava_group$key, levels = rev(Subflava_group_hc_order$order))
+long_df_Subflava_group$y <- factor(long_df_Subflava_group$y, levels = rev(Subflava_group_hc_order$order))
+
+
+ANI_plot <- ggplot(long_df_Subflava_group, aes(key,y)) +
+  geom_tile(aes(fill = z)) + 
+  scale_fill_gradient2(low = "blue",
+                       mid = "lightgray",
+                       high = "red",
+                       midpoint = 0.95,
+                       limits =c(0.925, 1),
+                       na.value="darkblue",
+                       name = "ANI (%)")+
+  ylab("") +  
+  xlab("") + 
+  theme_classic() + 
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(color = "black", size = 10),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.margin=unit(c(0,0,0,0), "cm"),
+        legend.position = "top", 
+        legend.direction = "horizontal") 
+ 
+
+Empty_plot <- ggplot() + theme_void()
+
+Subflava_group_final <- egg::ggarrange(Empty_plot,Empty_plot,percent_reads_mapped_plot,
+                                       Empty_plot,Empty_plot,total_reads_mapped_plot,
+                                       Empty_plot,Empty_plot, total_reads_plot,
+                                       Subflava_group_ANI_dendrogram,ANI_plot,Subflava_group_breadth_heatmap,
+          ncol = 3,
+          nrow = 4,
+          heights = c(0.1,0.1,0.1,1),
+          widths  = c(0.15,0.75,2))
+
+
+# save Final plot (Will need editing in Adobe Illustrator)
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Subflava_group_final.pdf",Subflava_group_final, width = 32, height = 15)
+  
+```
+
+###### ANI Full Percent Identity
+
+```{r}
+
+# packages
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(phytools)
+library(tibble)
+library(dendextend)
+library(ape)
+library(dplyr)
+
+# load ANI data
+df_full <-read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_full_percentage_identity.txt", header = TRUE)
+
+# load ANI tree
+df_full_newick <-  ape::read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_full_percentage_identity.newick")
+
+# order ANI data by ANI tree
+df_full_newick_orders <- phytools::compute.mr(df_full_newick, type = "matrix")
+df_full_newick_rownames <- rev(rownames(df_full_newick_orders))
+data_ordered <- df_full[ order(match(df_full$key, df_full_newick_rownames)), ]
+df_full_newick_rownames_df_full <- as.data.frame(df_full_newick_rownames)
+cols_A<- ncol(df_full) -1
+df_full_newick_rownames_df_full2 <- as.data.frame(matrix(df_full_newick_rownames_df_full$df_full_newick_rownames, ncol = cols_A, byrow = TRUE))
+names(df_full_newick_rownames_df_full2) <- df_full_newick_rownames_df_full2[1,]
+df_full_newick_rownames_df_full3 <- df_full_newick_rownames_df_full2[-1,]
+df_full_newick_rownames_df_full3 <- df_full_newick_rownames_df_full3 %>% 
+  add_column(key = NA, .before = 1)
+data_ordered2<-data_ordered[names(df_full_newick_rownames_df_full3)]
+
+cols2<- ncol(data_ordered2) 
+long_df_full <- reshape2::melt(data_ordered2,
+                          id.vars=c("key"),
+                          measure.vars=colnames(data_ordered2[2:cols2]),
+                          variable.name="y",
+                          value.name="z")
+mylevels1 <- df_full_newick$tip.label
+long_df_full$key <- factor(long_df_full$key,levels=mylevels1)
+long_df_full$y <- factor(long_df_full$y, levels=mylevels1)
+
+
+# Subflava group
+Subflava_group <- long_df_full$key[74:127]
+
+# Subset data frame
+long_df_full_Subflava_group <- long_df_full %>% 
+  filter(key %in% Subflava_group) %>% 
+  filter(y %in% Subflava_group)
+
+
+# Density plot
+ggplot(long_df_full_Subflava_group, aes(x = z)) + 
+  geom_density(fill = "blue", alpha = 0.5, adjust = 0.01) +  # Add the density plot
+  geom_rug(color = "red") +  # Add rug plot with points along the x-axis
+  ggtitle("Density of Z Values with Data Points") +
+  xlab("Z Values") +
+  ylab("Density") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", color = "red")
+
+# Histogram
+# Add a new column to the data frame categorizing the 'z' values
+long_df_full_Subflava_group$color_group <- ifelse(long_df_full_Subflava_group$z < 0.75, "< 0.75", ">= 0.75")
+
+# Create the histogram for the 'z' variable with conditional coloring
+ggplot(long_df_full_Subflava_group, aes(x = z, fill = color_group)) + 
+  geom_histogram(binwidth = 0.001, color = "black", linewidth = 0.5) + 
+  scale_fill_manual(values = c("< 0.75" = "blue", ">= 0.75" = "red")) +
+  ggtitle("Histogram of ANI Values (binwidth = 0.001 )") +
+  xlab("ANI Values") +
+  ylab("Count") +
+  theme_minimal() +  # Optional: Adds a minimalistic theme to the plot
+  geom_vline(xintercept = 0.75, linetype = "dashed", color = "black") + 
+  geom_rug(color = "black", alpha = 0.5)  # Add rug plot with points along the x-axis
+
+# save plot
+
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_FULL_ANI_histogram.pdf_full", plot = last_plot(), width = 5, height = 3)
+
+
+# Hclust based on euclidian distances and ward linkage
+
+# Convert to wide format
+wide_df_full_Subflava_group <- long_df_full_Subflava_group %>% 
+  dplyr::select(key, y, z) %>% 
+  pivot_wider(names_from = key, values_from = z)
+
+
+# Convert tibble to data frame object
+wide_df_full_Subflava_group_df_full <- as.data.frame(wide_df_full_Subflava_group)
+
+# Rename row names to species IDs
+wide_df_full_Subflava_group_df_full2 <- wide_df_full_Subflava_group_df_full[,-1]
+rownames(wide_df_full_Subflava_group_df_full2) <- wide_df_full_Subflava_group_df_full[,1]
+
+# Reformat to matrix
+Subflava_group_matrix_FULL_ANI <- as.matrix(wide_df_full_Subflava_group_df_full2)
+
+
+# Calculate Euclidean distance among genomes
+Subflava_group_distances_FULL_ANI <- vegan::vegdist(Subflava_group_matrix_FULL_ANI, method = "euclidian")
+
+
+# Hierarchical clustering using Ward Linkage
+Subflava_group_hc_FULL_ANI <- hclust(Subflava_group_distances_FULL_ANI, method = "ward.D" )
+
+# Save Subflava ANI tree
+Subflava_group_FULL_ANI_HC_Euclidean_distances_tree <- as.phylo(Subflava_group_hc_FULL_ANI) 
+write.tree(Subflava_group_FULL_ANI_HC_Euclidean_distances_tree, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_FULL_ANI_HC_Euclidean_distances.newick") # look for the file in your working directory
+
+
+# plot ANI dendrogram 
+Subflava_group_FULL_ANI_dend_ob <- dendro_data(as.dendrogram(Subflava_group_hc_FULL_ANI),type = "rectangle")
+
+Subflava_group_FULL_ANI_dendrogram <- ggplot(segment(Subflava_group_FULL_ANI_dend_ob)) + 
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), linewidth = 1) + 
+  coord_flip() + 
+  scale_y_reverse(expand = c(0.2, 0)) +
+  scale_x_reverse() +
+  theme_classic() +
+  theme(axis.ticks.y = element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y =  element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(0,0,0,0), "cm"))
+
+# save dend plot
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Subflava_group_FULL_ANI_dendrogram.pdf",Subflava_group_FULL_ANI_dendrogram, width = 5, height = 7)
+
+
+# ANI heatmap 
+long_df_full_Subflava_group$key <- as.factor(long_df_full_Subflava_group$key)
+
+# Order based on hclust of ANI results
+Subflava_group_hc__FULL_ANI_order <- data.frame(order = Subflava_group_hc_FULL_ANI$labels[Subflava_group_hc_FULL_ANI$order])
+long_df_full_Subflava_group$key <- factor(long_df_full_Subflava_group$key, levels = rev(Subflava_group_hc__FULL_ANI_order$order))
+long_df_full_Subflava_group$y <- factor(long_df_full_Subflava_group$y, levels = rev(Subflava_group_hc__FULL_ANI_order$order))
+
+
+Subflava_FULL_ANI_plot <- ggplot(long_df_full_Subflava_group, aes(key,y)) +
+  geom_tile(aes(fill = z)) + 
+  scale_fill_gradient2(low = "blue",
+                       mid = "lightgray",
+                       high = "red",
+                       midpoint = 0.75,
+                       limits =c(0.5, 1),
+                       na.value="darkblue",
+                       name = "ANI Full Perecent Identity")+
+  ylab("") +  
+  xlab("") + 
+  theme_classic() + 
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(color = "black", size = 10),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.margin=unit(c(0,0,0,0), "cm"),
+        legend.position = "top", 
+        legend.direction = "horizontal") 
+
+
+
+Subflava_FULL_ANI_plot_final <- egg::ggarrange(Subflava_group_FULL_ANI_dendrogram, Subflava_FULL_ANI_plot,
+                                        ncol = 2,
+                                        nrow = 1,
+                                        widths  = c(0.15,1))
+
+
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Subflava_group_FULL_ANI_heatmap.pdf", Subflava_FULL_ANI_plot_final, width = 10, height = 8)
+
+
+```
+
+###### ANI Perecent Identity * Coverage
+
+```{r}
+
+# packages
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(phytools)
+library(tibble)
+library(dendextend)
+library(ape)
+library(dplyr)
+
+# load ANI data
+df_hadamard <-read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_hadamard.txt", header = TRUE)
+
+# load ANI tree
+df_hadamard_newick <-  ape::read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_hadamard.newick")
+
+# order ANI data by ANI tree
+df_hadamard_newick_orders <- phytools::compute.mr(df_hadamard_newick, type = "matrix")
+df_hadamard_newick_rownames <- rev(rownames(df_hadamard_newick_orders))
+data_ordered <- df_hadamard[ order(match(df_hadamard$key, df_hadamard_newick_rownames)), ]
+df_hadamard_newick_rownames_df_hadamard <- as.data.frame(df_hadamard_newick_rownames)
+cols_A<- ncol(df_hadamard) -1
+df_hadamard_newick_rownames_df_hadamard2 <- as.data.frame(matrix(df_hadamard_newick_rownames_df_hadamard$df_hadamard_newick_rownames, ncol = cols_A, byrow = TRUE))
+names(df_hadamard_newick_rownames_df_hadamard2) <- df_hadamard_newick_rownames_df_hadamard2[1,]
+df_hadamard_newick_rownames_df_hadamard3 <- df_hadamard_newick_rownames_df_hadamard2[-1,]
+df_hadamard_newick_rownames_df_hadamard3 <- df_hadamard_newick_rownames_df_hadamard3 %>% 
+  add_column(key = NA, .before = 1)
+data_ordered2<-data_ordered[names(df_hadamard_newick_rownames_df_hadamard3)]
+
+cols2<- ncol(data_ordered2) 
+long_df_hadamard <- reshape2::melt(data_ordered2,
+                               id.vars=c("key"),
+                               measure.vars=colnames(data_ordered2[2:cols2]),
+                               variable.name="y",
+                               value.name="z")
+mylevels1 <- df_hadamard_newick$tip.label
+long_df_hadamard$key <- factor(long_df_hadamard$key,levels=mylevels1)
+long_df_hadamard$y <- factor(long_df_hadamard$y, levels=mylevels1)
+
+
+# Subflava group
+Subflava_group <- long_df_hadamard$key[74:127]
+
+# Subset data frame
+long_df_hadamard_Subflava_group <- long_df_hadamard %>% 
+  filter(key %in% Subflava_group) %>% 
+  filter(y %in% Subflava_group)
+
+
+# Hclust based on euclidian distances and ward linkage
+# Convert to wide format
+wide_df_hadamard_Subflava_group <- long_df_hadamard_Subflava_group %>% 
+  dplyr::select(key, y, z) %>% 
+  pivot_wider(names_from = key, values_from = z)
+
+
+# Convert tibble to data frame object
+wide_df_hadamard_Subflava_group_df_hadamard <- as.data.frame(wide_df_hadamard_Subflava_group)
+
+# Rename row names to species IDs
+wide_df_hadamard_Subflava_group_df_hadamard2 <- wide_df_hadamard_Subflava_group_df_hadamard[,-1]
+rownames(wide_df_hadamard_Subflava_group_df_hadamard2) <- wide_df_hadamard_Subflava_group_df_hadamard[,1]
+
+# Reformat to matrix
+Subflava_group_matrix_HADAMARD_ANI <- as.matrix(wide_df_hadamard_Subflava_group_df_hadamard2)
+
+
+# Calculate Euclidean distance among genomes
+Subflava_group_distances_HADAMARD_ANI <- vegan::vegdist(Subflava_group_matrix_HADAMARD_ANI, method = "euclidian")
+
+
+# Hierarchical clustering using Ward Linkage
+Subflava_group_hc_HADAMARD_ANI <- hclust(Subflava_group_distances_HADAMARD_ANI, method = "ward.D" )
+
+# Save Subflava ANI tree
+Subflava_group_HADAMARD_ANI_HC_Euclidean_distances_tree <- as.phylo(Subflava_group_hc_HADAMARD_ANI) 
+write.tree(Subflava_group_HADAMARD_ANI_HC_Euclidean_distances_tree, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_HADAMARD_ANI_HC_Euclidean_distances.newick") # look for the file in your working directory
+
+
+# plot ANI dendrogram 
+Subflava_group_HADAMARD_ANI_dend_ob <- dendro_data(as.dendrogram(Subflava_group_hc_HADAMARD_ANI),type = "rectangle")
+
+Subflava_group_HADAMARD_ANI_dendrogram <- ggplot(segment(Subflava_group_HADAMARD_ANI_dend_ob)) + 
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), linewidth = 1) + 
+  coord_flip() + 
+  scale_y_reverse(expand = c(0.2, 0)) +
+  scale_x_reverse() +
+  theme_classic() +
+  theme(axis.ticks.y = element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y =  element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(0,0,0,0), "cm"))
+
+# save dend plot
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Subflava_group_HADAMARD_ANI_dendrogram.pdf",Subflava_group_HADAMARD_ANI_dendrogram, width = 5, height = 7)
+
+
+# ANI heatmap 
+long_df_hadamard_Subflava_group$key <- as.factor(long_df_hadamard_Subflava_group$key)
+
+# Order based on hclust of ANI results
+Subflava_group_hc__HADAMARD_ANI_order <- data.frame(order = Subflava_group_hc_HADAMARD_ANI$labels[Subflava_group_hc_HADAMARD_ANI$order])
+long_df_hadamard_Subflava_group$key <- factor(long_df_hadamard_Subflava_group$key, levels = rev(Subflava_group_hc__HADAMARD_ANI_order$order))
+long_df_hadamard_Subflava_group$y <- factor(long_df_hadamard_Subflava_group$y, levels = rev(Subflava_group_hc__HADAMARD_ANI_order$order))
+
+
+Subflava_HADAMARD_ANI_plot <- ggplot(long_df_hadamard_Subflava_group, aes(key,y)) +
+  geom_tile(aes(fill = z)) + 
+  scale_fill_gradient2(low = "blue",
+                       mid = "lightgray",
+                       high = "red",
+                       midpoint = 0.7772,
+                       limits =c( 0.6640, 1),
+                       na.value="darkblue",
+                       name = "ANI Perecent Identity * Coverage")+
+  ylab("") +  
+  xlab("") + 
+  theme_classic() + 
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(color = "black", size = 10),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.margin=unit(c(0,0,0,0), "cm"),
+        legend.position = "top", 
+        legend.direction = "horizontal") 
+
+
+
+Subflava_HADAMARD_ANI_plot_final <- egg::ggarrange(Subflava_group_HADAMARD_ANI_dendrogram, Subflava_HADAMARD_ANI_plot,
+                                               ncol = 2,
+                                               nrow = 1,
+                                               widths  = c(0.15,1))
+
+
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Subflava_group_HADAMARD_ANI_heatmap.pdf", Subflava_HADAMARD_ANI_plot_final, width = 10, height = 8)
+
+
+
+#library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering visualization
+library(dendextend) # for comparing two dendrograms
+
+# packages
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(phytools)
+library(tibble)
+library(dendextend)
+library(ape)
+library(dplyr)
+
+
+# WSS plot
+Subflava_HADAMARD_wss_plot <- fviz_nbclust(Subflava_group_matrix_HADAMARD_ANI, hcut, method = "wss") 
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_HADAMARD_hcut_optimal_clusters_wss_plot.pdf", Subflava_HADAMARD_wss_plot, width = 5, height = 4 )
+
+# silhouette plot
+Subflava_HADAMARD_silhouette_plot <- fviz_nbclust(Subflava_group_matrix_HADAMARD_ANI, hcut, method = "silhouette") 
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_HADAMARD_hcut_optimal_clusters_silhouette_plot.pdf", Subflava_HADAMARD_silhouette_plot, width = 5, height = 4 )
+
+
+# Gap statistic plot
+Subflava_HADAMARD_gap_stat <- clusGap(Subflava_group_matrix_HADAMARD_ANI, hcut, K.max = 10, B = 1000)
+Subflava_HADAMARD_gap_stat_plot <- fviz_gap_stat(Subflava_HADAMARD_gap_stat, maxSE = list(method = "Tibs2001SEmax"))
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_HADAMARD_hcut_optimal_clusters_gap_stat_plot.pdf", Subflava_HADAMARD_gap_stat_plot, width = 5, height = 4 )
+
+
+# Principle components cluster plot
+set.seed(456)
+Subflava_HADAMARD_final <- hcut(Subflava_group_matrix_HADAMARD_ANI, 5)
+Subflava_HADAMARD_prin_components_plot <- fviz_cluster(Subflava_HADAMARD_final, data = Subflava_group_matrix_HADAMARD_ANI,
+                                                       geom = c("point"),
+                                                       ggtheme = theme_classic())
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_HADAMARD_hcut_optimal_clusters_prin_components_plot.pdf", Subflava_HADAMARD_prin_components_plot, width = 5, height = 4 )
+
+
+# Assuming 'final' is your list object
+Subflava_HADAMARD_hcut_cluster_data <- data.frame(Pangenome_ID = names(Subflava_HADAMARD_final$cluster), Cluster = Subflava_HADAMARD_final$cluster, row.names = NULL)
+
+# Save list
+write.table(Subflava_HADAMARD_hcut_cluster_data, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_HADAMARD_hcut_optimal_clusters.txt", row.names = FALSE, quote = FALSE, sep = "\t")
+
+
+
+```
+
+###### ANI Coverage
+
+```{r}
+
+# packages
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(phytools)
+library(tibble)
+library(dendextend)
+library(ape)
+library(dplyr)
+
+# load ANI data
+df_coverage <-read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_alignment_coverage.txt", header = TRUE)
+
+# load ANI tree
+df_coverage_newick <-  ape::read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_alignment_coverage.newick")
+
+# order ANI data by ANI tree
+df_coverage_newick_orders <- phytools::compute.mr(df_coverage_newick, type = "matrix")
+df_coverage_newick_rownames <- rev(rownames(df_coverage_newick_orders))
+data_ordered <- df_coverage[ order(match(df_coverage$key, df_coverage_newick_rownames)), ]
+df_coverage_newick_rownames_df_coverage <- as.data.frame(df_coverage_newick_rownames)
+cols_A<- ncol(df_coverage) -1
+df_coverage_newick_rownames_df_coverage2 <- as.data.frame(matrix(df_coverage_newick_rownames_df_coverage$df_coverage_newick_rownames, ncol = cols_A, byrow = TRUE))
+names(df_coverage_newick_rownames_df_coverage2) <- df_coverage_newick_rownames_df_coverage2[1,]
+df_coverage_newick_rownames_df_coverage3 <- df_coverage_newick_rownames_df_coverage2[-1,]
+df_coverage_newick_rownames_df_coverage3 <- df_coverage_newick_rownames_df_coverage3 %>% 
+  add_column(key = NA, .before = 1)
+data_ordered2<-data_ordered[names(df_coverage_newick_rownames_df_coverage3)]
+
+cols2<- ncol(data_ordered2) 
+long_df_coverage <- reshape2::melt(data_ordered2,
+                               id.vars=c("key"),
+                               measure.vars=colnames(data_ordered2[2:cols2]),
+                               variable.name="y",
+                               value.name="z")
+mylevels1 <- df_coverage_newick$tip.label
+long_df_coverage$key <- factor(long_df_coverage$key,levels=mylevels1)
+long_df_coverage$y <- factor(long_df_coverage$y, levels=mylevels1)
+
+
+# Subflava group
+Subflava_group <- long_df_coverage$key[74:127]
+
+# Subset data frame
+long_df_coverage_Subflava_group <- long_df_coverage %>% 
+  filter(key %in% Subflava_group) %>% 
+  filter(y %in% Subflava_group)
+
+
+# Hclust based on euclidian distances and ward linkage
+# Convert to wide format
+wide_df_coverage_Subflava_group <- long_df_coverage_Subflava_group %>% 
+  dplyr::select(key, y, z) %>% 
+  pivot_wider(names_from = key, values_from = z)
+
+
+# Convert tibble to data frame object
+wide_df_coverage_Subflava_group_df_coverage <- as.data.frame(wide_df_coverage_Subflava_group)
+
+# Rename row names to species IDs
+wide_df_coverage_Subflava_group_df_coverage2 <- wide_df_coverage_Subflava_group_df_coverage[,-1]
+rownames(wide_df_coverage_Subflava_group_df_coverage2) <- wide_df_coverage_Subflava_group_df_coverage[,1]
+
+# Reformat to matrix
+Subflava_group_matrix_COVERAGE_ANI <- as.matrix(wide_df_coverage_Subflava_group_df_coverage2)
+
+
+# Calculate Euclidean distance among genomes
+Subflava_group_distances_COVERAGE_ANI <- vegan::vegdist(Subflava_group_matrix_COVERAGE_ANI, method = "euclidian")
+
+
+# Hierarchical clustering using Ward Linkage
+Subflava_group_hc_COVERAGE_ANI <- hclust(Subflava_group_distances_COVERAGE_ANI, method = "ward.D" )
+
+# Save Subflava ANI tree
+Subflava_group_COVERAGE_ANI_HC_Euclidean_distances_tree <- as.phylo(Subflava_group_hc_COVERAGE_ANI) 
+write.tree(Subflava_group_COVERAGE_ANI_HC_Euclidean_distances_tree, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_COVERAGE_ANI_HC_Euclidean_distances.newick") # look for the file in your working directory
+
+
+# plot ANI dendrogram 
+Subflava_group_COVERAGE_ANI_dend_ob <- dendro_data(as.dendrogram(Subflava_group_hc_COVERAGE_ANI),type = "rectangle")
+
+Subflava_group_COVERAGE_ANI_dendrogram <- ggplot(segment(Subflava_group_COVERAGE_ANI_dend_ob)) + 
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), linewidth = 1) + 
+  coord_flip() + 
+  scale_y_reverse(expand = c(0.2, 0)) +
+  scale_x_reverse() +
+  theme_classic() +
+  theme(axis.ticks.y = element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y =  element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(0,0,0,0), "cm"))
+
+# save dend plot
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Subflava_group_COVERAGE_ANI_dendrogram.pdf",Subflava_group_COVERAGE_ANI_dendrogram, width = 5, height = 7)
+
+
+# ANI heatmap 
+long_df_coverage_Subflava_group$key <- as.factor(long_df_coverage_Subflava_group$key)
+
+# Order based on hclust of ANI results
+Subflava_group_hc__COVERAGE_ANI_order <- data.frame(order = Subflava_group_hc_COVERAGE_ANI$labels[Subflava_group_hc_COVERAGE_ANI$order])
+long_df_coverage_Subflava_group$key <- factor(long_df_coverage_Subflava_group$key, levels = rev(Subflava_group_hc__COVERAGE_ANI_order$order))
+long_df_coverage_Subflava_group$y <- factor(long_df_coverage_Subflava_group$y, levels = rev(Subflava_group_hc__COVERAGE_ANI_order$order))
+
+
+Subflava_COVERAGE_ANI_plot <- ggplot(long_df_coverage_Subflava_group, aes(key,y)) +
+  geom_tile(aes(fill = z)) + 
+  scale_fill_gradient(low = "gray",
+                       high = "red",
+                       limits =c( 0.65, 1),
+                       na.value="darkblue",
+                       name = "ANI Coverage")+
+  ylab("") +  
+  xlab("") + 
+  theme_classic() + 
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(color = "black", size = 10),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.margin=unit(c(0,0,0,0), "cm"),
+        legend.position = "top", 
+        legend.direction = "horizontal") 
+
+
+
+Subflava_COVERAGE_ANI_plot_final <- egg::ggarrange(Subflava_group_COVERAGE_ANI_dendrogram, Subflava_COVERAGE_ANI_plot,
+                                               ncol = 2,
+                                               nrow = 1,
+                                               widths  = c(0.15,1))
+
+
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Subflava_group_COVERAGE_ANI_heatmap.pdf", Subflava_COVERAGE_ANI_plot_final, width = 10, height = 8)
+
+
+Subflava_ANI_coverage_summary <- as.data.frame.matrix(summary(long_df_coverage_Subflava_group$z))
+
+Subflava_ANI_coverage_summary <- long_df_coverage_Subflava_group %>% 
+  summarise(Min = min(z),
+            Median = median(z),
+            Mean = mean(z),
+            Max = max(z))
+
+
+library(gt)
+
+Subflava_ANI_coverage_summary_table <- gt::gt(Subflava_ANI_coverage_summary) 
+
+gtsave(Subflava_ANI_coverage_summary_table, "/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Subflava_ANI_coverage_summary.pdf")
+
+```
+
+
+
+###### 8.1.ii. Breadth of Coverage
+
+```{r}
+
+Subflava_group_wide_breadth <- Subflava_group_Breadth_df %>% 
+  dplyr::select(bins, layers, value) %>% 
+  pivot_wider(names_from = layers, values_from = value) %>% 
+  as.data.frame()
+
+# rename row names to species IDs
+Subflava_group_wide_breadth_2 <- Subflava_group_wide_breadth[,-1]
+rownames(Subflava_group_wide_breadth_2) <- Subflava_group_wide_breadth[,1]
+
+# Convert to matrix object
+Subflava_group_wide_breadth_2_matrix <- as.matrix(Subflava_group_wide_breadth_2)
+
+# Calculate Euclidean distance among samples
+Subflava_group_breadth_Euclidean_distances <- vegan::vegdist(Subflava_group_wide_breadth_2_matrix, method = "euclidean")
+
+  
+# Hierarchical clustering using Complete Linkage
+Subflava_group_breadth_HC_Euclidean_distances <- hclust(Subflava_group_breadth_Euclidean_distances, method = "ward.D" )
+
+# create dedrogram object
+Subflava_group_breadth_HC_Euclidean_distances_dendrogram <- as.dendrogram(Subflava_group_breadth_HC_Euclidean_distances)
+
+# Save HC tree
+Subflava_group_breadth_HC_Euclidean_distances_tree <- as.phylo(Subflava_group_breadth_HC_Euclidean_distances) 
+write.tree(Subflava_group_breadth_HC_Euclidean_distances_tree, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_breadth_HC_Euclidean_distances.newick") # look for the file in your working directory
+
+
+# create rectangular lines object
+Subflava_group_breadth_HC_Euclidean_distances_dendrogram_ddata <- dendro_data(Subflava_group_breadth_HC_Euclidean_distances_dendrogram, type = "rectangle")
+
+Subflava_group_breadth_HC_Euclidean_dendrogram <- ggplot(segment(Subflava_group_breadth_HC_Euclidean_distances_dendrogram_ddata)) + 
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), linewidth = 1) + 
+  coord_flip() + 
+  scale_y_reverse(expand = c(0.2, 0)) +
+  scale_x_reverse() +
+  theme_classic() +
+  theme(axis.ticks.y = element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y =  element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.05, "lines"),
+        plot.margin=unit(c(0,0,0,0), "cm"))
+
+# save dend plot
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Dendrograms/Subflava_group_breadth_HC_Euclidean_dendrogram.pdf",Subflava_group_breadth_HC_Euclidean_dendrogram, width = 5, height = 7)
+
+
+
+# reorder genomes for triples plot based on hclust
+Subflava_hc_euclidean_order <- Subflava_group_breadth_HC_Euclidean_distances$labels[Subflava_group_breadth_HC_Euclidean_distances$order]
+Subflava_group_Breadth_df$bins <- factor(Subflava_group_Breadth_df$bins, levels = Subflava_hc_euclidean_order)
+
+
+```
+
+###### 8.1.ii.1 plot
+
+```{r}
+
+# set colors for heat map
+paleta_new = rev(RColorBrewer::brewer.pal(n = 11, name = "RdYlBu"))
+
+# Colors, including gray for the first segment
+colors <- c("gray", paleta_new)
+
+# Set up bar positioning for plots
+dodge <- position_dodge(width=0.9)
+
+# total_reads_mapped_plot
+total_reads_mapped_plot <- ggplot(data = Subflava_group_Breadth_df, aes(x=reorder(layers, -total_number_reads), y=total_reads_mapped)) + 
+  geom_bar(stat = 'identity',position = dodge, color = "darkblue") +
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") +
+  scale_y_continuous(expand = c(0, 0), limits=c(0, 25000000), breaks=seq(0,25000000,by=25000000), oob=squish, labels = scales::comma) +
+  #coord_cartesian(ylim=c(0,100000000)) +
+  xlab(NULL)+
+  ylab(expression(atop("No. of reads mapped", "(0 - 25 million)"))) +  # Modified y-axis label
+  theme_classic() + 
+  theme(text = element_text(size = 8),
+        axis.ticks.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(angle = -270, vjust = 0.5, hjust = 0.5),  # Try -90 degrees rotation
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "lightblue")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,-0.001,1), "cm"))+
+  force_panelsizes(cols = unit(c(4,2,2,4,4,2,.75,2,1), "cm"), 
+                 TRUE)
+
+# total_reads_plot
+total_reads_plot <- ggplot(data = Subflava_group_Breadth_df, aes(x=reorder(layers, -total_number_reads), y=total_number_reads)) + 
+  geom_bar(stat = 'identity',position = dodge, color = "darkblue") +
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") +
+  scale_y_continuous(expand = c(0, 0), limits=c(0, 200000000), breaks=seq(0,200000000,by=200000000), oob=squish, labels = scales::comma) +
+  #coord_cartesian(ylim=c(0,100000000)) +
+  xlab(NULL)+
+  ylab(expression(atop("Total reads", "(0 - 200 million)"))) +  # Modified y-axis label
+  theme_classic() + 
+  theme(text = element_text(size = 8),
+        axis.ticks.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x = element_blank(),
+        axis.text.y=element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(angle = -270, vjust = 0.5, hjust = 0.5),  # Try -90 degrees rotation
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "lightblue")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,-0.001,1), "cm"))+
+  force_panelsizes(cols = unit(c(4,2,2,4,4,2,.75,2,1), "cm"), 
+                 TRUE)
+
+# percent_reads_mapped_plot
+percent_reads_mapped_plot <- ggplot(data = Subflava_group_Breadth_df, aes(x=reorder(layers, -total_number_reads), y=percent_reads_mapped)) + 
+  geom_bar(stat = 'identity',position = dodge, color = "darkblue") +
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") +
+  scale_y_continuous(expand = c(0, 0), limits=c(0, 50), breaks=seq(0,50,by=50), oob=squish, labels = scales::comma) +
+  #coord_cartesian(ylim=c(0,100000000)) +
+  xlab(NULL)+
+  ylab(expression(atop("Percent reads mapped", "(0 - 50 %)"))) +  # Modified y-axis label
+  theme_classic() + 
+  theme(text = element_text(size = 8),
+        axis.ticks.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(angle = -270, vjust = 0.5, hjust = 0.5),  # Try -90 degrees rotation
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "lightblue")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,-0.001,1), "cm"))+
+  force_panelsizes(cols = unit(c(4,2,2,4,4,2,.75,2,1), "cm"), 
+                 TRUE)
+
+# Breadth heatmap
+Subflava_group_breadth_heatmap <- ggplot(data = Subflava_group_Breadth_df, aes(x=reorder(layers,-total_number_reads), y=bins, fill=value)) +
+  geom_tile(height=1, width=1) + 
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") + 
+  scale_fill_gradientn(colours = colors,
+                       limits=c(0.005, 0.5),
+                       #breaks=seq(0.005,0.5,by=0.1),
+                       breaks = c(0.5, 0.4, 0.3, 0.2, 0.1, 0.005),
+                       labels = c("> 50 %", "40 %", "30 %", "20 %", "10 %", "< 0.5 %"),
+                       oob=squish) +
+  # scale_fill_gradientn(colours = colors,
+  #                      limits=c(0.005, 1),
+  #                      #breaks=seq(0.005,0.5,by=0.1),
+  #                      breaks = c(1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.005),
+  #                      labels = c("100 %","90 %","80 %","70 %","60 %","50 %", "40 %", "30 %", "20 %", "10 %", "< 0.5 %"),
+  #                      oob=squish) + 
+  scale_y_discrete(limits = rev(levels(Subflava_group_Breadth_df$bins))) +
+  ylab(NULL) +  
+  xlab(NULL) + 
+  theme_classic() + 
+  guides(fill = guide_colourbar(barwidth = 1,
+                                barheight = 10,
+                                title = "Breadth of coverage",
+                                ticks = TRUE,
+                                ticks.colour = "white",
+                                ticks.linewidth = 0.5)) +
+  theme(text = element_text(size = 12),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y =  element_text(size = 6, color = "black"),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "black")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text=element_text(size=12)) + 
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,1,1), "cm")) +
+  force_panelsizes(cols = unit(c(4,2,2,4,4,2,.75,2,1), "cm"), 
+                 TRUE)
+
+
+Empty_plot <- ggplot() + theme_void()
+
+Subflava_group_HC_eculidean_breadth_final <- egg::ggarrange(Empty_plot,percent_reads_mapped_plot,
+                                       Empty_plot,total_reads_mapped_plot,
+                                       Empty_plot,total_reads_plot,
+                                       Subflava_group_breadth_HC_Euclidean_dendrogram, Subflava_group_breadth_heatmap,
+          ncol = 2,
+          nrow = 4,
+          heights = c(0.1,0.1,0.1,1),
+          widths  = c(0.15,1))
+
+
+# save Final plot (Will need editing in Adobe Illustrator)
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Subflava_group_HC_eculidean_breadth_final.pdf",Subflava_group_HC_eculidean_breadth_final, width = 15, height = 8)
+  
+
+```
+
+###### 8.1.iii. Q2Q3 Depth of Coverage
+
+```{r}
+
+
+DoC_df <- read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Strain_level_updated_Q2Q3_mean_coverage_data.csv", header = TRUE)
+
+# filter for subflava group genomes
+Subflava_group_DoC_df <- DoC_df %>% 
+  filter(bins %in% Subflava_group) 
+
+Subflava_group_DoC_df$bins <- as.factor(Subflava_group_DoC_df$bins)
+
+# specify order for site terms
+Subflava_group_DoC_df$site <- factor(Subflava_group_DoC_df$site, levels = c("SUPP", "SUBP", "KG", "BM", "TD", "PT", "HP", "TH", "SV"))
+
+# Convert to wide form
+Subflava_group_wide_DoC <- Subflava_group_DoC_df %>% 
+  dplyr::select(bins, layers, value) %>% 
+  pivot_wider(names_from = layers, values_from = value) %>% 
+  as.data.frame()
+
+# rename row names to species IDs
+Subflava_group_wide_DoC_2 <- Subflava_group_wide_DoC[,-1]
+rownames(Subflava_group_wide_DoC_2) <- Subflava_group_wide_DoC[,1]
+
+# Convert to matrix object
+Subflava_group_wide_DoC_2_matrix <- as.matrix(Subflava_group_wide_DoC_2)
+
+# Calculate Euclidean distance among samples
+Subflava_group_DoC_Euclidean_distances <- vegan::vegdist(Subflava_group_wide_DoC_2_matrix, method = "euclidean")
+
+  
+# Hierarchical clustering using Complete Linkage
+Subflava_group_DoC_HC_Euclidean_distances <- hclust(Subflava_group_DoC_Euclidean_distances, method = "ward.D" )
+
+# create dedrogram object
+Subflava_group_DoC_HC_Euclidean_distances_dendrogram <- as.dendrogram(Subflava_group_DoC_HC_Euclidean_distances)
+
+# Save HC tree
+Subflava_group_DoC_HC_Euclidean_distances_tree <- as.phylo(Subflava_group_DoC_HC_Euclidean_distances) 
+write.tree(Subflava_group_DoC_HC_Euclidean_distances_tree, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_DoC_HC_Euclidean_distances.newick") # look for the file in your working directory
+
+
+```
+
+
+###### 8.1.iii.1 plot
+
+```{r}
+
+
+```
+
+
+######  8.1. Tanglegrams
+
+###### 1.b.i. BoC vs ANI 
+
+```{r}
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+
+# Load ANI tree
+ANI_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_ANI_HC_Euclidean_distances.newick")
+
+# Load Breadth HC tree
+Breadth_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_breadth_HC_Euclidean_distances.newick")
+
+
+##### Breadth vs ANI ##### 
+# convert to dendrogram objects
+dend_Breadth_tree <- ape::chronos(Breadth_tree)
+dend_Breadth_tree_2 <- as.dendrogram.phylo(dend_Breadth_tree)
+dend_ANI_tree <- ape::chronos(ANI_tree)
+dend_ANI_tree_2 <- as.dendrogram.phylo(dend_ANI_tree)
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_Breadth_vs_ANI <- dendlist(dend_ANI_tree_2,dend_Breadth_tree_2) 
+
+
+
+entanglement(DEND_LIST_Breadth_vs_ANI %>% dendextend::untangle(method="labels"))
+entanglement(DEND_LIST_Breadth_vs_ANI %>% dendextend::untangle(method="ladderize"))
+entanglement(DEND_LIST_Breadth_vs_ANI %>% dendextend::untangle(method="random"))
+entanglement(DEND_LIST_Breadth_vs_ANI %>% dendextend::untangle(method="step1side"))
+entanglement(DEND_LIST_Breadth_vs_ANI %>% dendextend::untangle(method="step2side"))
+entanglement(DEND_LIST_Breadth_vs_ANI %>% dendextend::untangle(method="DendSer"))
+
+Breadth_vs_ANI_TANGLEGRAM <- DEND_LIST_Breadth_vs_ANI %>% dendextend::untangle(method="random") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_Breadth_vs_ANI_tanglegram.pdf", width = 10, height = 8) 
+
+Breadth_vs_ANI_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                                  highlight_distinct_edges=FALSE,
+                                  common_subtrees_color_branches=FALSE,
+                                  highlight_branches_lwd=FALSE,
+                                  lwd=3, 
+                                  lab.cex = 0.65, edge.lwd = 2, 
+                                  margin_inner = 20, 
+                                  columns_width = c(1, 0.5, 1), 
+                                  axes=FALSE,
+                                  color_lines = "black",
+                                  main = paste("entanglement =",
+                                               round(entanglement(Breadth_vs_ANI_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+```
+
+
+###### 1.b.ii. Boc vs Pan
+
+```{r}
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+# Load Pangenome tree
+Pangenome_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/G_0213/gene_cluster_frequencies_custom_newick")
+
+# Subsetting the tree by keeping only the tips mentioned in tip_labels
+
+# First, find all tip labels in the tree that are not in your list
+tips_to_remove <- setdiff(Pangenome_tree$tip.label, Subflava_group)
+
+# Then, use drop.tip to remove these tips from the tree
+Subflava_group_pangenome_tree <- drop.tip(Pangenome_tree, tips_to_remove)
+
+plot(Subflava_group_pangenome_tree)
+
+
+# Load Breadth HC tree
+Breadth_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_breadth_HC_Euclidean_distances.newick")
+
+
+##### Breadth vs ANI ##### 
+# convert to dendrogram objects
+dend_Breadth_tree <- ape::chronos(Breadth_tree)
+dend_Breadth_tree_2 <- as.dendrogram.phylo(dend_Breadth_tree)
+
+dend_Subflava_group_pangenome_tree <- ape::chronos(Subflava_group_pangenome_tree)
+dend_Subflava_group_pangenome_tree_2 <- as.dendrogram.phylo(dend_Subflava_group_pangenome_tree)
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_PAN_vs_ANI <- dendlist(dend_Subflava_group_pangenome_tree_2,dend_Breadth_tree_2) 
+
+
+
+entanglement(DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="labels"))
+entanglement(DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="ladderize"))
+entanglement(DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="random"))
+entanglement(DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="step1side"))
+entanglement(DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="step2side"))
+entanglement(DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="DendSer"))
+
+Breadth_vs_PAN_TANGLEGRAM <- DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="random") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_Breadth_vs_PAN_tanglegram.pdf", width = 10, height = 8) 
+
+Breadth_vs_PAN_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                                  highlight_distinct_edges=FALSE,
+                                  common_subtrees_color_branches=FALSE,
+                                  highlight_branches_lwd=FALSE,
+                                  lwd=3, 
+                                  lab.cex = 0.65, edge.lwd = 2, 
+                                  margin_inner = 20, 
+                                  columns_width = c(1, 0.5, 1), 
+                                  axes=FALSE,
+                                  color_lines = "black",
+                                  main = paste("entanglement =",
+                                               round(entanglement(Breadth_vs_PAN_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+```
+
+
+###### 1.b.iii. Q2Q3_DoC vs ANI
+
+```{r}
+
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+# Load ANI tree
+ANI_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_ANI_HC_Euclidean_distances.newick")
+
+# Load DoC HC tree
+DoC_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_DoC_HC_Euclidean_distances.newick")
+
+
+##### DoC vs ANI ##### 
+# convert to dendrogram objects
+dend_DoC_tree <- ape::chronos(DoC_tree)
+dend_DoC_tree_2 <- as.dendrogram.phylo(dend_DoC_tree)
+
+dend_ANI_tree <- ape::chronos(ANI_tree)
+dend_ANI_tree_2 <- rev(as.dendrogram.phylo(dend_ANI_tree))
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_ANI_vs_DOC <- dendlist(dend_ANI_tree_2,dend_DoC_tree_2) 
+
+
+
+# entanglement(DEND_LIST_ANI_vs_DOC %>% dendextend::untangle(method="labels"))
+# entanglement(DEND_LIST_ANI_vs_DOC %>% dendextend::untangle(method="ladderize"))
+# entanglement(DEND_LIST_ANI_vs_DOC %>% dendextend::untangle(method="random"))
+# entanglement(DEND_LIST_ANI_vs_DOC %>% dendextend::untangle(method="step1side"))
+# entanglement(DEND_LIST_ANI_vs_DOC %>% dendextend::untangle(method="step2side"))
+# entanglement(DEND_LIST_ANI_vs_DOC %>% dendextend::untangle(method="DendSer"))
+
+DoC_vs_ANI_TANGLEGRAM <- DEND_LIST_ANI_vs_DOC %>% dendextend::untangle(method="random") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_DoC_vs_ANI_tanglegram.pdf", width = 10, height = 8) 
+
+DoC_vs_ANI_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                                  highlight_distinct_edges=FALSE,
+                                  common_subtrees_color_branches=FALSE,
+                                  highlight_branches_lwd=FALSE,
+                                  lwd=3, 
+                                  lab.cex = 0.65, edge.lwd = 2, 
+                                  margin_inner = 14, 
+                                  columns_width = c(1, 0.5, 1), 
+                                  axes=FALSE,
+                                  color_lines = "black",
+                                  main = paste("entanglement =",
+                                               round(entanglement(DoC_vs_ANI_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+```
+
+###### 1.b.iv. Q2Q3_DoC vs Pan
+
+```{r}
+
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+# Load Pangenome tree
+Pangenome_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/G_0213/gene_cluster_frequencies_custom_newick")
+
+# Subsetting the tree by keeping only the tips mentioned in tip_labels
+
+# First, find all tip labels in the tree that are not in your list
+tips_to_remove <- setdiff(Pangenome_tree$tip.label, Subflava_group)
+
+# Then, use drop.tip to remove these tips from the tree
+Subflava_group_pangenome_tree <- drop.tip(Pangenome_tree, tips_to_remove)
+
+plot(Subflava_group_pangenome_tree)
+
+
+# Load Breadth HC tree
+DoC_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_DoC_HC_Euclidean_distances.newick")
+
+
+##### DoC vs ANI ##### 
+# convert to dendrogram objects
+dend_DoC_tree <- ape::chronos(DoC_tree)
+dend_DoC_tree_2 <- as.dendrogram.phylo(dend_DoC_tree)
+
+dend_Subflava_group_pangenome_tree <- ape::chronos(Subflava_group_pangenome_tree)
+dend_Subflava_group_pangenome_tree_2 <- rev(as.dendrogram.phylo(dend_Subflava_group_pangenome_tree))
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_PAN_vs_DOC <- dendlist(dend_DoC_tree_2, dend_Subflava_group_pangenome_tree_2) 
+
+
+
+entanglement(DEND_LIST_PAN_vs_DOC %>% dendextend::untangle(method="labels"))
+entanglement(DEND_LIST_PAN_vs_DOC %>% dendextend::untangle(method="ladderize"))
+entanglement(DEND_LIST_PAN_vs_DOC %>% dendextend::untangle(method="random"))
+entanglement(DEND_LIST_PAN_vs_DOC %>% dendextend::untangle(method="step1side"))
+entanglement(DEND_LIST_PAN_vs_DOC %>% dendextend::untangle(method="step2side"))
+entanglement(DEND_LIST_PAN_vs_DOC %>% dendextend::untangle(method="DendSer"))
+
+DoC_vs_PAN_TANGLEGRAM <- DEND_LIST_PAN_vs_DOC %>% dendextend::untangle(method="step1side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_DoC_vs_PAN_tanglegram.pdf", width = 10, height = 8) 
+
+DoC_vs_PAN_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                                  highlight_distinct_edges=FALSE,
+                                  common_subtrees_color_branches=FALSE,
+                                  highlight_branches_lwd=FALSE,
+                                  lwd=3, 
+                                  lab.cex = 0.65, edge.lwd = 2, 
+                                  margin_inner = 14, 
+                                  columns_width = c(1, 0.5, 1), 
+                                  axes=FALSE,
+                                  color_lines = "black",
+                                  main = paste("entanglement =",
+                                               round(entanglement(DoC_vs_PAN_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+```
+
+###### 1.b.v. ANI vs Pan
+
+```{r}
+
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+
+# Load ANI tree
+ANI_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_ANI_HC_Euclidean_distances.newick")
+
+# Load Pangenome tree
+Pangenome_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/G_0213/gene_cluster_frequencies_custom_newick")
+
+# Subsetting the tree by keeping only the tips mentioned in tip_labels
+
+# First, find all tip labels in the tree that are not in your list
+tips_to_remove <- setdiff(Pangenome_tree$tip.label, Subflava_group)
+
+# Then, use drop.tip to remove these tips from the tree
+Subflava_group_pangenome_tree <- drop.tip(Pangenome_tree, tips_to_remove)
+
+##### ANI vs PAN ##### 
+# convert to dendrogram objects
+dend_ANI_tree <- ape::chronos(ANI_tree)
+dend_ANI_tree_2 <- as.dendrogram.phylo(dend_ANI_tree)
+
+dend_Subflava_group_pangenome_tree <- ape::chronos(Subflava_group_pangenome_tree)
+dend_Subflava_group_pangenome_tree_2 <- rev(as.dendrogram.phylo(dend_Subflava_group_pangenome_tree))
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_PAN_vs_ANI <- dendlist(dend_ANI_tree_2, dend_Subflava_group_pangenome_tree_2) 
+
+
+
+entanglement(DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="labels"))
+entanglement(DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="ladderize"))
+entanglement(DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="random"))
+entanglement(DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="step1side"))
+entanglement(DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="step2side"))
+entanglement(DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="DendSer"))
+
+ANI_vs_PAN_TANGLEGRAM <- DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_ANI_vs_PAN_tanglegram.pdf", width = 10, height = 8) 
+
+ANI_vs_PAN_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                                  highlight_distinct_edges=FALSE,
+                                  common_subtrees_color_branches=FALSE,
+                                  highlight_branches_lwd=FALSE,
+                                  lwd=3, 
+                                  lab.cex = 0.65, edge.lwd = 2, 
+                                  margin_inner = 14, 
+                                  columns_width = c(1, 0.5, 1), 
+                                  axes=FALSE,
+                                  color_lines = "black",
+                                  main = paste("entanglement =",
+                                               round(entanglement(ANI_vs_PAN_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+```
+
+###### 1.b.vi. ANI vs Phylogeny
+
+```{r}
+
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+
+# Load ANI tree
+ANI_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_ANI_HC_Euclidean_distances.newick")
+
+# Load Phylo tree
+Phylo_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/Neisseriaceae_G_0213_bac71_sequences_with_outgroup.clean.fa.contree.newick")
+
+
+SCG_Phylo_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/G_0213_Pangenome_single_copy_core_genes-fasta.clean.fa.contree")
+
+
+# Subsetting the tree by keeping only the tips mentioned in tip_labels
+
+# First, find all tip labels in the tree that are not in your list
+tips_to_remove <- setdiff(SCG_Phylo_tree$tip.label, Subflava_group)
+
+# Then, use drop.tip to remove these tips from the tree
+Subflava_group_Phylo_tree <- drop.tip(SCG_Phylo_tree, tips_to_remove)
+
+##### ANI vs PHY ##### 
+# convert to dendrogram objects
+dend_ANI_tree <- ape::chronos(ANI_tree)
+dend_ANI_tree_2 <- as.dendrogram.phylo(dend_ANI_tree)
+
+dend_Subflava_group_Phylo_tree <- ape::chronos(Subflava_group_Phylo_tree)
+dend_Subflava_group_Phylo_tree_2 <- rev(as.dendrogram.phylo(dend_Subflava_group_Phylo_tree))
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_PHY_vs_ANI <- dendlist(dend_ANI_tree_2, dend_Subflava_group_Phylo_tree_2) 
+
+
+
+entanglement(DEND_LIST_PHY_vs_ANI %>% dendextend::untangle(method="labels"))
+entanglement(DEND_LIST_PHY_vs_ANI %>% dendextend::untangle(method="ladderize"))
+entanglement(DEND_LIST_PHY_vs_ANI %>% dendextend::untangle(method="random"))
+entanglement(DEND_LIST_PHY_vs_ANI %>% dendextend::untangle(method="step1side"))
+entanglement(DEND_LIST_PHY_vs_ANI %>% dendextend::untangle(method="step2side"))
+entanglement(DEND_LIST_PHY_vs_ANI %>% dendextend::untangle(method="DendSer"))
+
+ANI_vs_PHY_TANGLEGRAM <- DEND_LIST_PHY_vs_ANI %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_ANI_vs_Pan_SCG_PHY_tanglegram.pdf", width = 10, height = 8) 
+
+ANI_vs_PHY_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                               highlight_distinct_edges=FALSE,
+                               common_subtrees_color_branches=FALSE,
+                               highlight_branches_lwd=FALSE,
+                               lwd=3, 
+                               lab.cex = 0.65, edge.lwd = 2, 
+                               margin_inner = 14, 
+                               columns_width = c(1, 0.5, 1), 
+                               axes=FALSE,
+                               color_lines = "black",
+                               main = paste("entanglement =",
+                                            round(entanglement(ANI_vs_PHY_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+```
+
+###### 1.b.vii. Phylogeny vs Pan
+
+```{r}
+
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+
+# Load Pangenome tree
+Pangenome_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/G_0213/gene_cluster_frequencies_custom_newick")
+
+# Subsetting the tree by keeping only the tips mentioned in tip_labels
+
+# First, find all tip labels in the tree that are not in your list
+PAN_tips_to_remove <- setdiff(Pangenome_tree$tip.label, Subflava_group)
+
+# Then, use drop.tip to remove these tips from the tree
+Subflava_group_pangenome_tree <- drop.tip(Pangenome_tree, PAN_tips_to_remove)
+
+
+# Load Phylo tree
+Phylo_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/Neisseriaceae_G_0213_bac71_sequences_with_outgroup.clean.fa.contree.newick")
+
+# Subsetting the tree by keeping only the tips mentioned in tip_labels
+
+# First, find all tip labels in the tree that are not in your list
+Phylo_tips_to_remove <- setdiff(Phylo_tree$tip.label, Subflava_group)
+
+# Then, use drop.tip to remove these tips from the tree
+Subflava_group_Phylo_tree <- drop.tip(Phylo_tree, Phylo_tips_to_remove)
+
+##### PAN vs PHY ##### 
+# convert to dendrogram objects
+dend_PAN_tree <- ape::chronos(Subflava_group_pangenome_tree)
+dend_PAN_tree_2 <- as.dendrogram.phylo(dend_PAN_tree)
+
+dend_Subflava_group_Phylo_tree <- ape::chronos(Subflava_group_Phylo_tree)
+dend_Subflava_group_Phylo_tree_2 <- rev(as.dendrogram.phylo(dend_Subflava_group_Phylo_tree))
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_PHY_vs_PAN <- dendlist(dend_PAN_tree_2, dend_Subflava_group_Phylo_tree_2) 
+
+
+
+entanglement(DEND_LIST_PHY_vs_PAN %>% dendextend::untangle(method="labels"))
+entanglement(DEND_LIST_PHY_vs_PAN %>% dendextend::untangle(method="ladderize"))
+entanglement(DEND_LIST_PHY_vs_PAN %>% dendextend::untangle(method="random"))
+entanglement(DEND_LIST_PHY_vs_PAN %>% dendextend::untangle(method="step1side"))
+entanglement(DEND_LIST_PHY_vs_PAN %>% dendextend::untangle(method="step2side"))
+entanglement(DEND_LIST_PHY_vs_PAN %>% dendextend::untangle(method="DendSer"))
+
+PAN_vs_PHY_TANGLEGRAM <- DEND_LIST_PHY_vs_PAN %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_PAN_vs_PHY_tanglegram.pdf", width = 10, height = 8) 
+
+PAN_vs_PHY_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                               highlight_distinct_edges=FALSE,
+                               common_subtrees_color_branches=FALSE,
+                               highlight_branches_lwd=FALSE,
+                               lwd=3, 
+                               lab.cex = 0.65, edge.lwd = 2, 
+                               margin_inner = 14, 
+                               columns_width = c(1, 0.5, 1), 
+                               axes=FALSE,
+                               color_lines = "black",
+                               main = paste("entanglement =",
+                                            round(entanglement(PAN_vs_PHY_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+```
+
+
+###### 1.c. Optimal number of ANI-based clusters
+
+```{r}
+
+#library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering visualization
+library(dendextend) # for comparing two dendrograms
+
+# packages
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(phytools)
+library(tibble)
+library(dendextend)
+library(ape)
+library(dplyr)
+
+# load ANI data
+df <-read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_percentage_identity.txt", header = TRUE)
+
+# load ANI tree
+df_newick <-  ape::read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_percentage_identity.newick")
+
+# order ANI data by ANI tree
+df_newick_orders <- phytools::compute.mr(df_newick, type = "matrix")
+df_newick_rownames <- rev(rownames(df_newick_orders))
+data_ordered <- df[ order(match(df$key, df_newick_rownames)), ]
+df_newick_rownames_df <- as.data.frame(df_newick_rownames)
+cols_A<- ncol(df) -1
+df_newick_rownames_df2 <- as.data.frame(matrix(df_newick_rownames_df$df_newick_rownames, ncol = cols_A, byrow = TRUE))
+names(df_newick_rownames_df2) <- df_newick_rownames_df2[1,]
+df_newick_rownames_df3 <- df_newick_rownames_df2[-1,]
+df_newick_rownames_df3 <- df_newick_rownames_df3 %>% 
+  add_column(key = NA, .before = 1)
+data_ordered2<-data_ordered[names(df_newick_rownames_df3)]
+
+cols2<- ncol(data_ordered2) 
+long_df <- reshape2::melt(data_ordered2,
+                          id.vars=c("key"),
+                          measure.vars=colnames(data_ordered2[2:cols2]),
+                          variable.name="y",
+                          value.name="z")
+mylevels1 <- df_newick$tip.label
+long_df$key <- factor(long_df$key,levels=mylevels1)
+long_df$y <- factor(long_df$y, levels=mylevels1)
+
+
+# Subflava group
+Subflava_group <- long_df$key[160:213]
+
+# Subset data frame
+long_df_Subflava_group <- long_df %>% 
+  filter(key %in% Subflava_group) %>% 
+  filter(y %in% Subflava_group)
+
+# Hclust based on euclidian distances and ward linkage
+
+# Convert to wide format
+wide_df_Subflava_group <- long_df_Subflava_group %>% 
+  dplyr::select(key, y, z) %>% 
+  pivot_wider(names_from = key, values_from = z)
+
+
+# Convert tibble to data frame object
+wide_df_Subflava_group_df <- as.data.frame(wide_df_Subflava_group)
+
+# Rename row names to species IDs
+wide_df_Subflava_group_df2 <- wide_df_Subflava_group_df[,-1]
+rownames(wide_df_Subflava_group_df2) <- wide_df_Subflava_group_df[,1]
+
+# Reformat to matrix
+Subflava_group_matrix <- as.matrix(wide_df_Subflava_group_df2)
+
+
+# WSS plot
+wss_plot <- fviz_nbclust(Subflava_group_matrix, hcut, method = "wss") 
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_ANI_hcut_optimal_clusters_wss_plot.pdf", wss_plot, width = 5, height = 4 )
+
+
+# Gap statistic plot
+gap_stat <- clusGap(Subflava_group_matrix, hcut, K.max = 10, B = 1000)
+gap_stat_plot <- fviz_gap_stat(gap_stat)
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_ANI_hcut_optimal_clusters_gap_stat_plot.pdf", gap_stat_plot, width = 5, height = 4 )
+
+
+# Get list of clusters
+set.seed(123)
+final <- hcut(Subflava_group_matrix, 7)
+prin_components_plot <- fviz_cluster(final, data = Subflava_group_matrix,
+             geom = c("point"),
+             ggtheme = theme_classic())
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_ANI_hcut_optimal_clusters_prin_components_plot.pdf", prin_components_plot, width = 5, height = 4 )
+
+
+
+
+# Assuming 'final' is your list object
+ANI_hcut_cluster_data <- data.frame(Pangenome_ID = names(final$cluster), Cluster = final$cluster, row.names = NULL)
+
+# Save list
+write.table(ANI_hcut_cluster_data, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_ANI_hcut_optimal_clusters.txt", row.names = FALSE, quote = FALSE, sep = "\t")
+```
+
+
+
+###### 1.d. Optimal number of BoC-based clusters
+
+```{r}
+
+Subflava_group_wide_breadth_2_matrix
+
+# WSS plot
+breadth_wss_plot <- fviz_nbclust(Subflava_group_wide_breadth_2_matrix, hcut, method = "wss") 
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_breadth_hcut_optimal_clusters_wss_plot.pdf", breadth_wss_plot, width = 5, height = 4 )
+
+
+# Gap statistic plot
+breadth_gap_stat <- clusGap(Subflava_group_wide_breadth_2_matrix, hcut, K.max = 10, B = 100)
+breadth_gap_stat_plot <- fviz_gap_stat(breadth_gap_stat, maxSE = list(method = "firstmax"))
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_breadth_hcut_optimal_clusters_gap_stat_plot.pdf", breadth_gap_stat_plot, width = 5, height = 4 )
+
+
+# Get list of clusters
+set.seed(123)
+breadth_final_4 <- hcut(Subflava_group_wide_breadth_2_matrix, 4)
+breadth_prin_components_plot_4 <- fviz_cluster(breadth_final_4, data = Subflava_group_wide_breadth_2_matrix,
+             geom = c("point"),
+             ggtheme = theme_classic())
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_breadth_hcut_4_optimal_clusters_prin_components_plot.pdf", breadth_prin_components_plot_4, width = 5, height = 4 )
+
+breadth_final_5 <- hcut(Subflava_group_wide_breadth_2_matrix, 5)
+breadth_prin_components_plot_5 <- fviz_cluster(breadth_final_5, data = Subflava_group_wide_breadth_2_matrix,
+             geom = c("point"),
+             ggtheme = theme_classic())
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_breadth_hcut_5_optimal_clusters_prin_components_plot.pdf", breadth_prin_components_plot_5, width = 5, height = 4 )
+
+breadth_final_6 <- hcut(Subflava_group_wide_breadth_2_matrix, 6)
+breadth_prin_components_plot_6 <- fviz_cluster(breadth_final_6, data = Subflava_group_wide_breadth_2_matrix,
+             geom = c("point"),
+             ggtheme = theme_classic())
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_breadth_hcut_6_optimal_clusters_prin_components_plot.pdf", breadth_prin_components_plot_6, width = 5, height = 4 )
+
+breadth_final_7 <- hcut(Subflava_group_wide_breadth_2_matrix, 7)
+breadth_prin_components_plot_7 <- fviz_cluster(breadth_final_7, data = Subflava_group_wide_breadth_2_matrix,
+             geom = c("point"),
+             ggtheme = theme_classic())
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_breadth_hcut_7_optimal_clusters_prin_components_plot.pdf", breadth_prin_components_plot_7, width = 5, height = 4 )
+
+View(data.frame(Pangenome_ID = names(breadth_final_7$cluster), Cluster = breadth_final_7$cluster, row.names = NULL))
+
+# Assuming 'final' is your list object
+breadth_hcut_cluster_data <- data.frame(Pangenome_ID = names(breadth_final$cluster), Cluster = breadth_final$cluster, row.names = NULL)
+
+# Save list
+write.table(ANI_hcut_cluster_data, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_ANI_hcut_optimal_clusters.txt", row.names = FALSE, quote = FALSE, sep = "\t")
+```
+
+###### Tanglegram ANI Percent Identity vs. Full Perecent Identity
+
+```{r}
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+
+# Load trees
+FULL_ANI_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_FULL_ANI_HC_Euclidean_distances.newick")
+PER_ANI_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_ANI_HC_Euclidean_distances.newick")
+
+##### FULL_ANI vs PHY ##### 
+# convert to dendrogram objects
+dend_FULL_ANI_tree <- ape::chronos(FULL_ANI_tree)
+dend_FULL_ANI_tree_2 <- as.dendrogram.phylo(dend_FULL_ANI_tree)
+dend_PER_ANI_tree <- ape::chronos(PER_ANI_tree)
+dend_PER_ANI_tree_2 <- as.dendrogram.phylo(dend_PER_ANI_tree)
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_PER_vs_FULL_ANI <- dendlist(dend_PER_ANI_tree_2, dend_FULL_ANI_tree_2) 
+
+# untangle
+PER_vs_FULL_ANI_TANGLEGRAM <- DEND_LIST_PER_vs_FULL_ANI %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_PER_vs_FULL_ANI_tanglegram.pdf", width = 10, height = 8) 
+
+PER_vs_FULL_ANI_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                                    highlight_distinct_edges=FALSE,
+                                    common_subtrees_color_branches=FALSE,
+                                    highlight_branches_lwd=FALSE,
+                                    lwd=3, 
+                                    lab.cex = 0.65, edge.lwd = 2, 
+                                    margin_inner = 14, 
+                                    columns_width = c(1, 0.5, 1), 
+                                    axes=FALSE,
+                                    color_lines = "black",
+                                    main = paste("entanglement =",
+                                                 round(entanglement(PER_vs_FULL_ANI_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+
+```
+
+###### Tanglegram ANI Full Percent Identity vs. SCCG Phylogeny
+
+```{r}
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+
+# Load trees
+FULL_ANI_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_FULL_ANI_HC_Euclidean_distances.newick")
+
+SCG_Phylo_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/G_0213_Pangenome_single_copy_core_genes-fasta.clean.fa.contree")
+
+
+# First, find all tip labels in the tree that are not in your list
+tips_to_remove <- setdiff(SCG_Phylo_tree$tip.label, Subflava_group)
+
+# Then, use drop.tip to remove these tips from the tree
+Subflava_group_Phylo_tree <- drop.tip(SCG_Phylo_tree, tips_to_remove)
+
+##### FULL_ANI vs PHY ##### 
+# convert to dendrogram objects
+dend_FULL_ANI_tree <- ape::chronos(FULL_ANI_tree)
+dend_FULL_ANI_tree_2 <- as.dendrogram.phylo(dend_FULL_ANI_tree)
+
+dend_Subflava_group_Phylo_tree <- ape::chronos(Subflava_group_Phylo_tree)
+dend_Subflava_group_Phylo_tree_2 <- rev(as.dendrogram.phylo(dend_Subflava_group_Phylo_tree))
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_PHY_vs_FULL_ANI <- dendlist(dend_FULL_ANI_tree_2, dend_Subflava_group_Phylo_tree_2) 
+
+
+
+entanglement(DEND_LIST_PHY_vs_FULL_ANI %>% dendextend::untangle(method="labels"))
+entanglement(DEND_LIST_PHY_vs_FULL_ANI %>% dendextend::untangle(method="ladderize"))
+entanglement(DEND_LIST_PHY_vs_FULL_ANI %>% dendextend::untangle(method="random"))
+entanglement(DEND_LIST_PHY_vs_FULL_ANI %>% dendextend::untangle(method="step1side"))
+entanglement(DEND_LIST_PHY_vs_FULL_ANI %>% dendextend::untangle(method="step2side"))
+entanglement(DEND_LIST_PHY_vs_FULL_ANI %>% dendextend::untangle(method="DendSer"))
+
+FULL_ANI_vs_PHY_TANGLEGRAM <- DEND_LIST_PHY_vs_FULL_ANI %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_FULL_ANI_vs_Pan_SCG_PHY_tanglegram.pdf", width = 10, height = 8) 
+
+FULL_ANI_vs_PHY_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                               highlight_distinct_edges=FALSE,
+                               common_subtrees_color_branches=FALSE,
+                               highlight_branches_lwd=FALSE,
+                               lwd=3, 
+                               lab.cex = 0.65, edge.lwd = 2, 
+                               margin_inner = 14, 
+                               columns_width = c(1, 0.5, 1), 
+                               axes=FALSE,
+                               color_lines = "black",
+                               main = paste("entanglement =",
+                                            round(entanglement(FULL_ANI_vs_PHY_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+```
+
+###### Tanglegram ANI Percent Identity * Coverage vs. SCCG Phylogeny
+
+```{r}
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+
+# Load trees
+HADAMARD_ANI_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_HADAMARD_ANI_HC_Euclidean_distances.newick")
+
+SCG_Phylo_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/G_0213_Pangenome_single_copy_core_genes-fasta.clean.fa.contree")
+
+
+# First, find all tip labels in the tree that are not in your list
+tips_to_remove <- setdiff(SCG_Phylo_tree$tip.label, Subflava_group)
+
+# Then, use drop.tip to remove these tips from the tree
+Subflava_group_Phylo_tree <- drop.tip(SCG_Phylo_tree, tips_to_remove)
+
+##### HADAMARD_ANI vs PHY ##### 
+# convert to dendrogram objects
+dend_HADAMARD_ANI_tree <- ape::chronos(HADAMARD_ANI_tree)
+dend_HADAMARD_ANI_tree_2 <- as.dendrogram.phylo(dend_HADAMARD_ANI_tree)
+
+dend_Subflava_group_Phylo_tree <- ape::chronos(Subflava_group_Phylo_tree)
+dend_Subflava_group_Phylo_tree_2 <- rev(as.dendrogram.phylo(dend_Subflava_group_Phylo_tree))
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_PHY_vs_HADAMARD_ANI <- dendlist(dend_HADAMARD_ANI_tree_2, dend_Subflava_group_Phylo_tree_2) 
+
+
+HADAMARD_ANI_vs_PHY_TANGLEGRAM <- DEND_LIST_PHY_vs_HADAMARD_ANI %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_HADAMARD_ANI_vs_Pan_SCG_PHY_tanglegram.pdf", width = 10, height = 8) 
+
+HADAMARD_ANI_vs_PHY_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                               highlight_distinct_edges=FALSE,
+                               common_subtrees_color_branches=FALSE,
+                               highlight_branches_lwd=FALSE,
+                               lwd=3, 
+                               lab.cex = 0.65, edge.lwd = 2, 
+                               margin_inner = 14, 
+                               columns_width = c(1, 0.5, 1), 
+                               axes=FALSE,
+                               color_lines = "black",
+                               main = paste("entanglement =",
+                                            round(entanglement(HADAMARD_ANI_vs_PHY_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+```
+
+
+###### Tanglegram Bac 71 Phylogeny vs. SCCG Phylogeny
+
+```{r}
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+
+# Load trees
+BAC71_Phylo_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/Neisseriaceae_G_0213_bac71_sequences_with_outgroup.clean.fa.contree")
+SCG_Phylo_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/G_0213_Pangenome_single_copy_core_genes-fasta.clean.fa.contree")
+
+# Subset trees by keeping only the tips mentioned in tip_labels
+# First, find all tip labels in the tree that are not in your list
+SCG_tips_to_remove <- setdiff(SCG_Phylo_tree$tip.label, Subflava_group)
+# Then, use drop.tip to remove these tips from the tree
+SCG_Subflava_group_Phylo_tree <- drop.tip(SCG_Phylo_tree, tips_to_remove)
+
+# First, find all tip labels in the tree that are not in your list
+BAC71_tips_to_remove <- setdiff(BAC71_Phylo_tree$tip.label, Subflava_group)
+# Then, use drop.tip to remove these tips from the tree
+BAC71_Subflava_group_Phylo_tree <- drop.tip(BAC71_Phylo_tree, BAC71_tips_to_remove)
+
+
+# BAC 71 tree with bootstrap support values
+pdf("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/Subflava_group_Bac71_phylogeny.pdf",
+    width = 8, height = 10)
+plot(BAC71_Subflava_group_Phylo_tree, cex = 0.5, edge.width = 0.5)
+nodelabels(text = BAC71_Subflava_group_Phylo_tree$node.label,node=2:BAC71_Subflava_group_Phylo_tree$Nnode+Ntip(BAC71_Subflava_group_Phylo_tree),frame="none",adj=c(1.2,-0.5), cex = 0.5, col = "red")
+add.scale.bar()
+
+dev.off() 
+
+# PAN SCCG tree with bootstrap support values
+pdf("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/Subflava_group_Pan_SCCG_phylogeny.pdf",
+    width = 8, height = 10)
+plot(SCG_Subflava_group_Phylo_tree, cex = 0.5, edge.width = 0.5)
+nodelabels(text = SCG_Subflava_group_Phylo_tree$node.label,node=2:SCG_Subflava_group_Phylo_tree$Nnode+Ntip(SCG_Subflava_group_Phylo_tree),frame="none",adj=c(1.2,-0.5), cex = 0.5, col = "red")
+add.scale.bar()
+
+dev.off() 
+
+
+# convert to dendrogram objects
+dend_BAC71_Phylo_tree <- ape::chronos(BAC71_Subflava_group_Phylo_tree)
+dend_BAC71_Phylo_tree_2 <- as.dendrogram.phylo(dend_BAC71_Phylo_tree)
+
+dend_SCG_Phylo_tree <- ape::chronos(SCG_Subflava_group_Phylo_tree)
+dend_SCG_Phylo_tree_2 <- rev(as.dendrogram.phylo(dend_SCG_Phylo_tree))
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_BAC71_vs_SCCG_PHY <- dendlist(dend_BAC71_Phylo_tree_2, dend_SCG_Phylo_tree_2) 
+BAC71_vs_SCCG_PHY_TANGLEGRAM <- DEND_LIST_BAC71_vs_SCCG_PHY %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_group_Bac71_vs_Pan_SCG_PHY_tanglegram.pdf", width = 10, height = 8) 
+
+BAC71_vs_SCCG_PHY_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                               highlight_distinct_edges=FALSE,
+                               common_subtrees_color_branches=FALSE,
+                               highlight_branches_lwd=FALSE,
+                               lwd=3, 
+                               lab.cex = 0.65, edge.lwd = 2, 
+                               margin_inner = 14, 
+                               columns_width = c(1, 0.5, 1), 
+                               axes=FALSE,
+                               color_lines = "black",
+                               main = paste("entanglement =",
+                                            round(entanglement(BAC71_vs_SCCG_PHY_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+```
+
+
+
+##### 8.2. Mucosa genomes
+
+###### ANI Percent Identity
+
+```{r}
+
+
+# packages
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(phytools)
+library(tibble)
+library(dendextend)
+library(ape)
+library(dplyr)
+
+# load ANI data
+df <-read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_percentage_identity.txt", header = TRUE)
+
+# load ANI tree
+df_newick <-  ape::read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_percentage_identity.newick")
+
+# order ANI data by ANI tree
+df_newick_orders <- phytools::compute.mr(df_newick, type = "matrix")
+df_newick_rownames <- rev(rownames(df_newick_orders))
+data_ordered <- df[ order(match(df$key, df_newick_rownames)), ]
+df_newick_rownames_df <- as.data.frame(df_newick_rownames)
+cols_A<- ncol(df) -1
+df_newick_rownames_df2 <- as.data.frame(matrix(df_newick_rownames_df$df_newick_rownames, ncol = cols_A, byrow = TRUE))
+names(df_newick_rownames_df2) <- df_newick_rownames_df2[1,]
+df_newick_rownames_df3 <- df_newick_rownames_df2[-1,]
+df_newick_rownames_df3 <- df_newick_rownames_df3 %>% 
+  add_column(key = NA, .before = 1)
+data_ordered2<-data_ordered[names(df_newick_rownames_df3)]
+
+cols2<- ncol(data_ordered2) 
+long_df <- reshape2::melt(data_ordered2,
+                          id.vars=c("key"),
+                          measure.vars=colnames(data_ordered2[2:cols2]),
+                          variable.name="y",
+                          value.name="z")
+mylevels1 <- df_newick$tip.label
+long_df$key <- factor(long_df$key,levels=mylevels1)
+long_df$y <- factor(long_df$y, levels=mylevels1)
+
+
+# Mucosa group
+Mucosa_group <- long_df$key[64:93]
+
+# Subset data frame
+long_df_Mucosa_group <- long_df %>% 
+  filter(key %in% Mucosa_group) %>% 
+  filter(y %in% Mucosa_group)
+
+
+# Density plot
+ggplot(long_df_Mucosa_group, aes(x = z)) + 
+  geom_density(fill = "blue", alpha = 0.5, adjust = 0.01) +  # Add the density plot
+  geom_rug(color = "red") +  # Add rug plot with points along the x-axis
+  ggtitle("Density of Z Values with Data Points") +
+  xlab("Z Values") +
+  ylab("Density") +
+  geom_vline(xintercept = 0.95, linetype = "dashed", color = "red")
+
+# Histogram
+# Add a new column to the data frame categorizing the 'z' values
+long_df_Mucosa_group$color_group <- ifelse(long_df_Mucosa_group$z < 0.95, "< 0.95", ">= 0.95")
+
+# Create the histogram for the 'z' variable with conditional coloring
+ggplot(long_df_Mucosa_group, aes(x = z, fill = color_group)) + 
+  geom_histogram(binwidth = 0.001, color = "black", linewidth = 0.5) + 
+  scale_fill_manual(values = c("< 0.95" = "blue", ">= 0.95" = "red")) +
+  ggtitle("Histogram of ANI Values (binwidth = 0.001 )") +
+  xlab("ANI Values") +
+  ylab("Count") +
+  theme_minimal() +  # Optional: Adds a minimalistic theme to the plot
+  geom_vline(xintercept = 0.95, linetype = "dashed", color = "black") + 
+  geom_rug(color = "black", alpha = 0.5)  # Add rug plot with points along the x-axis
+
+# save plot
+
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_ANI_histogram.pdf", plot = last_plot(), width = 5, height = 3)
+
+
+# Hclust based on euclidian distances and ward linkage
+
+# Convert to wide format
+wide_df_Mucosa_group <- long_df_Mucosa_group %>% 
+  dplyr::select(key, y, z) %>% 
+  pivot_wider(names_from = key, values_from = z)
+
+
+# Convert tibble to data frame object
+wide_df_Mucosa_group_df <- as.data.frame(wide_df_Mucosa_group)
+
+# Rename row names to species IDs
+wide_df_Mucosa_group_df2 <- wide_df_Mucosa_group_df[,-1]
+rownames(wide_df_Mucosa_group_df2) <- wide_df_Mucosa_group_df[,1]
+
+# Reformat to matrix
+Mucosa_group_matrix <- as.matrix(wide_df_Mucosa_group_df2)
+
+
+# Calculate Euclidean distance among genomes
+Mucosa_group_distances <- vegan::vegdist(Mucosa_group_matrix, method = "euclidian")
+
+
+# Hierarchical clustering using Ward Linkage
+Mucosa_group_hc <- hclust(Mucosa_group_distances, method = "ward.D" )
+
+# Save Mucosa ANI tree
+Mucosa_group_ANI_HC_Euclidean_distances_tree <- as.phylo(Mucosa_group_hc) 
+write.tree(Mucosa_group_ANI_HC_Euclidean_distances_tree, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_ANI_HC_Euclidean_distances.newick") # look for the file in your working directory
+
+
+# plot ANI dendrogram 
+plot(ggdendro::dendro_data(as.dendrogram(Mucosa_group_hc)),type = "rectangle")
+
+dend_ob <- dendro_data(as.dendrogram(Mucosa_group_hc),type = "rectangle")
+
+Mucosa_group_ANI_dendrogram <- ggplot(segment(dend_ob)) + 
+         geom_segment(aes(x = x, y = y, xend = xend, yend = yend), linewidth = 1) + 
+         coord_flip() + 
+         scale_y_reverse(expand = c(0.2, 0)) +
+         scale_x_reverse() +
+         theme_classic() +
+         theme(axis.ticks.y = element_blank(),
+               axis.ticks.x=element_blank(),
+               axis.text.x = element_blank(),
+               axis.text.y =  element_blank(),
+               axis.line.x = element_blank(),
+               axis.line.y = element_blank(),
+               axis.title.y = element_blank(),
+               axis.title.x = element_blank()) +
+         theme(panel.spacing.x=unit(0.1, "lines"),
+               plot.margin=unit(c(0,0,0,0), "cm"))
+  
+# save dend plot
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Mucosa_group_ANI_dendrogram.pdf",Mucosa_group_ANI_dendrogram, width = 5, height = 7)
+  
+
+# ANI heatmap 
+
+long_df_Mucosa_group$key <- as.factor(long_df_Mucosa_group$key)
+
+# Order based on hclust of ANI results
+Mucosa_group_hc_order <- data.frame(order = Mucosa_group_hc$labels[Mucosa_group_hc$order])
+long_df_Mucosa_group$key <- factor(long_df_Mucosa_group$key, levels = rev(Mucosa_group_hc_order$order))
+long_df_Mucosa_group$y <- factor(long_df_Mucosa_group$y, levels = rev(Mucosa_group_hc_order$order))
+
+
+Mucosa_ANI_plot <- ggplot(long_df_Mucosa_group, aes(key,y)) +
+  geom_tile(aes(fill = z)) + 
+  scale_fill_gradient2(low = "blue",
+                       mid = "lightgray",
+                       high = "red",
+                       midpoint = 0.95,
+                       limits =c(0.9, 1),
+                       na.value="darkblue",
+                       name = "ANI (%)")+
+  ylab("") +  
+  xlab("") + 
+  theme_classic() + 
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(color = "black", size = 10),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.margin=unit(c(0,0,0,0), "cm"),
+        legend.position = "top", 
+        legend.direction = "horizontal") 
+
+
+
+Mucosa_ANI_plot_final <- egg::ggarrange(Mucosa_group_ANI_dendrogram, Mucosa_ANI_plot,
+          ncol = 2,
+          nrow = 1,
+          widths  = c(0.15,1))
+ 
+
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Mucosa_group_ANI_heatmap.pdf", Mucosa_ANI_plot_final, width = 10, height = 8)
+```
+
+
+###### ANI Perecent Identity optimal number of clusters
+
+```{r}
+
+#library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering visualization
+library(dendextend) # for comparing two dendrograms
+
+# packages
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(phytools)
+library(tibble)
+library(dendextend)
+library(ape)
+library(dplyr)
+
+
+# WSS plot
+Mucosa_wss_plot <- fviz_nbclust(Mucosa_group_matrix, hcut, method = "wss") 
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_ANI_hcut_optimal_clusters_wss_plot.pdf", Mucosa_wss_plot, width = 5, height = 4 )
+
+
+# Gap statistic plot
+Mucosa_gap_stat <- clusGap(Mucosa_group_matrix, hcut, K.max = 10, B = 1000)
+Mucosa_gap_stat_plot <- fviz_gap_stat(Mucosa_gap_stat)
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_ANI_hcut_optimal_clusters_gap_stat_plot.pdf", Mucosa_gap_stat_plot, width = 5, height = 4 )
+
+
+# Principle components cluster plot
+set.seed(123)
+Mucosa_final <- hcut(Mucosa_group_matrix, 7)
+Mucosa_prin_components_plot <- fviz_cluster(Mucosa_final, data = Mucosa_group_matrix,
+             geom = c("point"),
+             ggtheme = theme_classic())
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_ANI_hcut_optimal_clusters_prin_components_plot.pdf", Mucosa_prin_components_plot, width = 5, height = 4 )
+
+
+# Assuming 'final' is your list object
+Mucosa_ANI_hcut_cluster_data <- data.frame(Pangenome_ID = names(Mucosa_final$cluster), Cluster = Mucosa_final$cluster, row.names = NULL)
+
+# Save list
+write.table(Mucosa_ANI_hcut_cluster_data, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_ANI_hcut_optimal_clusters.txt", row.names = FALSE, quote = FALSE, sep = "\t")
+
+```
+
+###### ANI Coverage
+
+
+```{r}
+
+# packages
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(phytools)
+library(tibble)
+library(dendextend)
+library(ape)
+library(dplyr)
+
+# load ANI data
+df_coverage <-read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_alignment_coverage.txt", header = TRUE)
+
+
+# Subset data frame
+long_df_coverage_Mucosa_group <- long_df_coverage %>% 
+  filter(key %in% Mucosa_group) %>% 
+  filter(y %in% Mucosa_group)
+
+# Set key as factor
+long_df_coverage_Mucosa_group$key <- as.factor(long_df_coverage_Mucosa_group$key)
+
+# Order based on hclust of ANI % identity results
+long_df_coverage_Mucosa_group$key <- factor(long_df_coverage_Mucosa_group$key, levels = rev(Mucosa_group_hc_order$order))
+long_df_coverage_Mucosa_group$y <- factor(long_df_coverage_Mucosa_group$y, levels = rev(Mucosa_group_hc_order$order))
+
+
+# ANI Alignment Coverage heatmap 
+Mucosa_COVERAGE_ANI_plot <- ggplot(long_df_coverage_Mucosa_group, aes(key,y)) +
+  geom_tile(aes(fill = z)) + 
+  scale_fill_gradient(low = "gray",
+                      high = "red",
+                      limits =c( 0.5, 1),
+                      na.value="darkblue",
+                      name = "ANI Coverage")+
+  ylab("") +  
+  xlab("") + 
+  theme_classic() + 
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(color = "black", size = 10),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.margin=unit(c(0,0,0,0), "cm"),
+        legend.position = "top", 
+        legend.direction = "horizontal") 
+
+
+
+Mucosa_COVERAGE_ANI_plot_final <- egg::ggarrange(Mucosa_group_ANI_dendrogram, Mucosa_COVERAGE_ANI_plot,
+                                                   ncol = 2,
+                                                   nrow = 1,
+                                                   widths  = c(0.15,1))
+
+
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Mucosa_group_COVERAGE_ANI_heatmap.pdf", Mucosa_COVERAGE_ANI_plot_final, width = 10, height = 8)
+
+
+
+Mucosa_ANI_coverage_summary <- long_df_coverage_Mucosa_group %>% 
+  summarise(Min = min(z),
+            Median = median(z),
+            Mean = mean(z),
+            Max = max(z))
+
+
+library(gt)
+
+Mucosa_ANI_coverage_summary_table <- gt::gt(Mucosa_ANI_coverage_summary) 
+
+gtsave(Mucosa_ANI_coverage_summary_table, "/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Mucosa_ANI_coverage_summary.pdf")
+
+```
+
+
+###### Bac 71 vs. PAN SCCG Phylogenies
+
+```{r}
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+
+# Load trees
+BAC71_Phylo_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/Neisseriaceae_G_0213_bac71_sequences_with_outgroup.clean.fa.contree")
+SCG_Phylo_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/G_0213_Pangenome_single_copy_core_genes-fasta.clean.fa.contree")
+
+# Subset trees by keeping only the tips mentioned in tip_labels
+# First, find all tip labels in the tree that are not in your list
+SCG_tips_to_remove <- setdiff(SCG_Phylo_tree$tip.label, Mucosa_group)
+# Then, use drop.tip to remove these tips from the tree
+SCG_Mucosa_group_Phylo_tree <- drop.tip(SCG_Phylo_tree, SCG_tips_to_remove)
+
+# First, find all tip labels in the tree that are not in your list
+BAC71_tips_to_remove <- setdiff(BAC71_Phylo_tree$tip.label, Mucosa_group)
+# Then, use drop.tip to remove these tips from the tree
+BAC71_Mucosa_group_Phylo_tree <- drop.tip(BAC71_Phylo_tree, BAC71_tips_to_remove)
+
+
+# BAC 71 tree with bootstrap support values
+pdf("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/Mucosa_group_Bac71_phylogeny.pdf",
+    width = 8, height = 10)
+plot(BAC71_Mucosa_group_Phylo_tree, cex = 0.5, edge.width = 0.5)
+nodelabels(text = BAC71_Mucosa_group_Phylo_tree$node.label,node=2:BAC71_Mucosa_group_Phylo_tree$Nnode+Ntip(BAC71_Mucosa_group_Phylo_tree),frame="none",adj=c(1.2,-0.5), cex = 0.5, col = "red")
+add.scale.bar()
+
+dev.off() 
+
+# PAN SCCG tree with bootstrap support values
+pdf("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/Mucosa_group_Pan_SCCG_phylogeny.pdf",
+    width = 8, height = 10)
+plot(SCG_Mucosa_group_Phylo_tree, cex = 0.5, edge.width = 0.5)
+nodelabels(text = SCG_Mucosa_group_Phylo_tree$node.label,node=2:SCG_Mucosa_group_Phylo_tree$Nnode+Ntip(SCG_Mucosa_group_Phylo_tree),frame="none",adj=c(1.2,-0.5), cex = 0.5, col = "red")
+add.scale.bar()
+
+dev.off() 
+
+
+# convert to dendrogram objects
+dend_BAC71_Phylo_tree <- ape::chronos(BAC71_Mucosa_group_Phylo_tree)
+dend_BAC71_Phylo_tree_2 <- as.dendrogram.phylo(dend_BAC71_Phylo_tree)
+
+dend_SCG_Phylo_tree <- ape::chronos(SCG_Mucosa_group_Phylo_tree)
+dend_SCG_Phylo_tree_2 <- rev(as.dendrogram.phylo(dend_SCG_Phylo_tree))
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_BAC71_vs_SCCG_PHY <- dendlist(dend_BAC71_Phylo_tree_2, dend_SCG_Phylo_tree_2) 
+BAC71_vs_SCCG_PHY_TANGLEGRAM <- DEND_LIST_BAC71_vs_SCCG_PHY %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_Bac71_vs_Pan_SCG_PHY_tanglegram.pdf", width = 10, height = 8) 
+
+BAC71_vs_SCCG_PHY_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                               highlight_distinct_edges=FALSE,
+                               common_subtrees_color_branches=FALSE,
+                               highlight_branches_lwd=FALSE,
+                               lwd=3, 
+                               lab.cex = 0.65, edge.lwd = 2, 
+                               margin_inner = 14, 
+                               columns_width = c(1, 0.5, 1), 
+                               axes=FALSE,
+                               color_lines = "black",
+                               main = paste("entanglement =",
+                                            round(entanglement(BAC71_vs_SCCG_PHY_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+```
+
+
+###### ANI-PAN-PHY tanglegrams 
+
+ANI percent identity
+
+```{r}
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+
+# Load ANI tree
+Mucosa_ANI_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_ANI_HC_Euclidean_distances.newick")
+
+################################################ 
+###### ANI vs PAN ###### 
+################################################
+
+# Load Pangenome tree
+Pangenome_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/G_0213/gene_cluster_frequencies_custom_newick")
+
+# Subsetting the tree by keeping only the tips mentioned in tip_labels
+
+# First, find all tip labels in the tree that are not in your list
+Mucosa_tips_to_remove <- setdiff(Pangenome_tree$tip.label, Mucosa_group)
+
+# Then, use drop.tip to remove these tips from the tree
+Mucosa_group_pangenome_tree <- drop.tip(Pangenome_tree, Mucosa_tips_to_remove)
+
+##### ANI vs PAN ##### 
+# convert to dendrogram objects
+Mucosa_dend_ANI_tree <- ape::chronos(Mucosa_ANI_tree)
+Mucosa_dend_ANI_tree_2 <- as.dendrogram.phylo(Mucosa_dend_ANI_tree)
+
+dend_Mucosa_group_pangenome_tree <- ape::chronos(Mucosa_group_pangenome_tree)
+dend_Mucosa_group_pangenome_tree_2 <- rev(as.dendrogram.phylo(dend_Mucosa_group_pangenome_tree))
+
+# make dendrogram list; second dedrogram will be fixed
+Mucosa_DEND_LIST_PAN_vs_ANI <- dendlist(Mucosa_dend_ANI_tree_2, dend_Mucosa_group_pangenome_tree_2) 
+
+
+
+entanglement(Mucosa_DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="labels"))
+entanglement(Mucosa_DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="ladderize"))
+entanglement(Mucosa_DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="random"))
+entanglement(Mucosa_DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="step1side"))
+entanglement(Mucosa_DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="step2side"))
+entanglement(Mucosa_DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="DendSer"))
+
+Mucosa_ANI_vs_PAN_TANGLEGRAM <- Mucosa_DEND_LIST_PAN_vs_ANI %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_ANI_vs_PAN_tanglegram.pdf", width = 10, height = 8) 
+
+Mucosa_ANI_vs_PAN_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                                  highlight_distinct_edges=FALSE,
+                                  common_subtrees_color_branches=FALSE,
+                                  highlight_branches_lwd=FALSE,
+                                  lwd=3, 
+                                  lab.cex = 0.65, edge.lwd = 2, 
+                                  margin_inner = 14, 
+                                  columns_width = c(1, 0.5, 1), 
+                                  axes=FALSE,
+                                  color_lines = "black",
+                                  main = paste("entanglement =",
+                                               round(entanglement(Mucosa_ANI_vs_PAN_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+################################################ 
+###### ANI vs BAC 71 PHY ###### 
+################################################ 
+
+# Load Phylo tree
+Phylo_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/Neisseriaceae_G_0213_bac71_sequences_with_outgroup.clean.fa.contree.newick")
+
+
+# First, find all tip labels in the tree that are not in your list
+Mucosa_tips_to_remove <- setdiff(Phylo_tree$tip.label, Mucosa_group)
+
+# Then, use drop.tip to remove these tips from the tree
+Mucosa_group_Phylo_tree <- drop.tip(Phylo_tree, Mucosa_tips_to_remove)
+
+dend_Mucosa_group_Phylo_tree <- ape::chronos(Mucosa_group_Phylo_tree)
+dend_Mucosa_group_Phylo_tree_2 <- rev(as.dendrogram.phylo(dend_Mucosa_group_Phylo_tree))
+
+# make dendrogram list; second dedrogram will be fixed
+Mucosa_DEND_LIST_ANI_vs_PHY <- dendlist(Mucosa_dend_ANI_tree_2, dend_Mucosa_group_Phylo_tree_2) 
+
+# entanglement(Mucosa_DEND_LIST_ANI_vs_PHY %>% dendextend::untangle(method="labels"))
+# entanglement(Mucosa_DEND_LIST_ANI_vs_PHY %>% dendextend::untangle(method="ladderize"))
+# entanglement(Mucosa_DEND_LIST_ANI_vs_PHY %>% dendextend::untangle(method="random"))
+# entanglement(Mucosa_DEND_LIST_ANI_vs_PHY %>% dendextend::untangle(method="step1side"))
+# entanglement(Mucosa_DEND_LIST_ANI_vs_PHY %>% dendextend::untangle(method="step2side"))
+# entanglement(Mucosa_DEND_LIST_ANI_vs_PHY %>% dendextend::untangle(method="DendSer"))
+
+Mucosa_ANI_vs_PHY_TANGLEGRAM <- Mucosa_DEND_LIST_ANI_vs_PHY %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_ANI_vs_PHY_tanglegram.pdf", width = 10, height = 8) 
+
+Mucosa_ANI_vs_PHY_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                                  highlight_distinct_edges=FALSE,
+                                  common_subtrees_color_branches=FALSE,
+                                  highlight_branches_lwd=FALSE,
+                                  lwd=3, 
+                                  lab.cex = 0.65, edge.lwd = 2, 
+                                  margin_inner = 14, 
+                                  columns_width = c(1, 0.5, 1), 
+                                  axes=FALSE,
+                                  color_lines = "black",
+                                  main = paste("entanglement =",
+                                               round(entanglement(Mucosa_ANI_vs_PHY_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+################################################ 
+###### PAN vs BAC 71 PHY ###### 
+################################################ 
+
+# make dendrogram list; second dedrogram will be fixed
+Mucosa_DEND_LIST_PAN_vs_PHY <- dendlist(dend_Mucosa_group_pangenome_tree_2, dend_Mucosa_group_Phylo_tree_2) 
+
+entanglement(Mucosa_DEND_LIST_PAN_vs_PHY %>% dendextend::untangle(method="labels"))
+entanglement(Mucosa_DEND_LIST_PAN_vs_PHY %>% dendextend::untangle(method="ladderize"))
+entanglement(Mucosa_DEND_LIST_PAN_vs_PHY %>% dendextend::untangle(method="random"))
+entanglement(Mucosa_DEND_LIST_PAN_vs_PHY %>% dendextend::untangle(method="step1side"))
+entanglement(Mucosa_DEND_LIST_PAN_vs_PHY %>% dendextend::untangle(method="step2side"))
+entanglement(Mucosa_DEND_LIST_PAN_vs_PHY %>% dendextend::untangle(method="DendSer"))
+
+Mucosa_PAN_vs_PHY_TANGLEGRAM <- Mucosa_DEND_LIST_PAN_vs_PHY %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_PAN_vs_PHY_tanglegram.pdf", width = 10, height = 8) 
+
+Mucosa_PAN_vs_PHY_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                                  highlight_distinct_edges=FALSE,
+                                  common_subtrees_color_branches=FALSE,
+                                  highlight_branches_lwd=FALSE,
+                                  lwd=3, 
+                                  lab.cex = 0.65, edge.lwd = 2, 
+                                  margin_inner = 14, 
+                                  columns_width = c(1, 0.5, 1), 
+                                  axes=FALSE,
+                                  color_lines = "black",
+                                  main = paste("entanglement =",
+                                               round(entanglement(Mucosa_PAN_vs_PHY_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+################################################ 
+###### ANI vs Pan SCCG PHY ###### 
+################################################
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+library(treeio)
+
+
+# Load ANI tree
+ANI_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_ANI_HC_Euclidean_distances.newick")
+
+SCG_Phylo_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/14_PHYLOGENOMICS/G_0213_Pangenome_single_copy_core_genes-fasta.clean.fa.contree")
+
+# First, find all tip labels in the tree that are not in your list
+tips_to_remove <- setdiff(SCG_Phylo_tree$tip.label, Mucosa_group)
+
+# Then, use drop.tip to remove these tips from the tree
+Mucosa_group_Phylo_tree <- drop.tip(SCG_Phylo_tree, tips_to_remove)
+
+# convert to dendrogram objects
+dend_ANI_tree <- ape::chronos(ANI_tree)
+dend_ANI_tree_2 <- as.dendrogram.phylo(dend_ANI_tree)
+
+dend_Mucosa_group_Phylo_tree <- ape::chronos(Mucosa_group_Phylo_tree)
+dend_Mucosa_group_Phylo_tree_2 <- rev(as.dendrogram.phylo(dend_Mucosa_group_Phylo_tree))
+
+# make dendrogram list; second dedrogram will be fixed
+DEND_LIST_PHY_vs_ANI <- dendlist(dend_ANI_tree_2, dend_Mucosa_group_Phylo_tree_2) 
+ANI_vs_PHY_TANGLEGRAM <- DEND_LIST_PHY_vs_ANI %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_ANI_vs_Pan_SCG_PHY_tanglegram.pdf", width = 10, height = 8) 
+
+ANI_vs_PHY_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                               highlight_distinct_edges=FALSE,
+                               common_subtrees_color_branches=FALSE,
+                               highlight_branches_lwd=FALSE,
+                               lwd=3, 
+                               lab.cex = 0.65, edge.lwd = 2, 
+                               margin_inner = 14, 
+                               columns_width = c(1, 0.5, 1), 
+                               axes=FALSE,
+                               color_lines = "black",
+                               main = paste("entanglement =",
+                                            round(entanglement(ANI_vs_PHY_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+```
+
+
+
+###### ANI & BoC
+
+ANI Percent Identity
+
+```{r}
+
+# packages
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(phytools)
+library(tibble)
+library(dendextend)
+library(ape)
+library(dplyr)
+library(ggdendro)
+library(scales)
+library(ggh4x)
+
+
+
+
+Breadth_df <- read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Strain_level_updated_detection_data.csv", header = TRUE)
+
+# filter for subflava group genomes
+Mucosa_group_Breadth_df <- Breadth_df %>% 
+  filter(bins %in% Mucosa_group) 
+
+Mucosa_group_Breadth_df$bins <- as.factor(Mucosa_group_Breadth_df$bins)
+
+# Order based on hclust of ANI results
+Mucosa_group_hc_order <- data.frame(order = Mucosa_group_hc$labels[Mucosa_group_hc$order])
+Mucosa_group_Breadth_df$bins <- factor(Mucosa_group_Breadth_df$bins, levels = Mucosa_group_hc_order$order)
+
+# specify order for site terms
+Mucosa_group_Breadth_df$site <- factor(Mucosa_group_Breadth_df$site, levels = c("SUPP", "SUBP", "KG", "BM", "TD", "PT", "HP", "TH", "SV"))
+
+# set colors for heat map
+paleta_new = rev(RColorBrewer::brewer.pal(n = 11, name = "RdYlBu"))
+
+# Colors, including gray for the first segment
+colors <- c("gray", paleta_new)
+
+# Set up bar positioning for plots
+dodge <- position_dodge(width=0.9)
+
+# total_reads_mapped_plot
+total_reads_mapped_plot <- ggplot(data = Mucosa_group_Breadth_df, aes(x=reorder(layers, -total_number_reads), y=total_reads_mapped)) + 
+  geom_bar(stat = 'identity',position = dodge, color = "darkblue") +
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") +
+  scale_y_continuous(expand = c(0, 0), limits=c(0, 25000000), breaks=seq(0,25000000,by=25000000), oob=squish, labels = scales::comma) +
+  #coord_cartesian(ylim=c(0,100000000)) +
+  xlab(NULL)+
+  ylab(expression(atop("No. of reads mapped", "(0 - 25 million)"))) +  # Modified y-axis label
+  theme_classic() + 
+  theme(text = element_text(size = 8),
+        axis.ticks.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(angle = -270, vjust = 0.5, hjust = 0.5),  # Try -90 degrees rotation
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "lightblue")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,-0.001,1), "cm"))+
+  force_panelsizes(cols = unit(c(8,4,4,8,8,4,1.5,4,2), "cm"), 
+                 TRUE)
+
+# total_reads_plot
+total_reads_plot <- ggplot(data = Mucosa_group_Breadth_df, aes(x=reorder(layers, -total_number_reads), y=total_number_reads)) + 
+  geom_bar(stat = 'identity',position = dodge, color = "darkblue") +
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") +
+  scale_y_continuous(expand = c(0, 0), limits=c(0, 200000000), breaks=seq(0,200000000,by=200000000), oob=squish, labels = scales::comma) +
+  #coord_cartesian(ylim=c(0,100000000)) +
+  xlab(NULL)+
+  ylab(expression(atop("Total reads", "(0 - 200 million)"))) +  # Modified y-axis label
+  theme_classic() + 
+  theme(text = element_text(size = 8),
+        axis.ticks.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x = element_blank(),
+        axis.text.y=element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(angle = -270, vjust = 0.5, hjust = 0.5),  # Try -90 degrees rotation
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "lightblue")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,-0.001,1), "cm"))+
+  force_panelsizes(cols = unit(c(8,4,4,8,8,4,1.5,4,2), "cm"), 
+                 TRUE)
+
+# percent_reads_mapped_plot
+percent_reads_mapped_plot <- ggplot(data = Mucosa_group_Breadth_df, aes(x=reorder(layers, -total_number_reads), y=percent_reads_mapped)) + 
+  geom_bar(stat = 'identity',position = dodge, color = "darkblue") +
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") +
+  scale_y_continuous(expand = c(0, 0), limits=c(0, 50), breaks=seq(0,50,by=50), oob=squish, labels = scales::comma) +
+  #coord_cartesian(ylim=c(0,100000000)) +
+  xlab(NULL)+
+  ylab(expression(atop("Percent reads mapped", "(0 - 50 %)"))) +  # Modified y-axis label
+  theme_classic() + 
+  theme(text = element_text(size = 8),
+        axis.ticks.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(angle = -270, vjust = 0.5, hjust = 0.5),  # Try -90 degrees rotation
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "lightblue")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,-0.001,1), "cm"))+
+  force_panelsizes(cols = unit(c(8,4,4,8,8,4,1.5,4,2), "cm"), 
+                 TRUE)
+
+# Breadth heatmap
+Mucosa_group_breadth_heatmap <- ggplot(data = Mucosa_group_Breadth_df, aes(x=reorder(layers,-total_number_reads), y=bins, fill=value)) +
+  geom_tile(height=1, width=1) + 
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") + 
+  scale_fill_gradientn(colours = colors,
+                       limits=c(0.005, 0.5),
+                       #breaks=seq(0.005,0.5,by=0.1),
+                       breaks = c(0.5, 0.4, 0.3, 0.2, 0.1, 0.005),
+                       labels = c("> 50 %", "40 %", "30 %", "20 %", "10 %", "< 0.5 %"),
+                       oob=squish) +
+  # scale_fill_gradientn(colours = colors,
+  #                      limits=c(0.005, 1),
+  #                      #breaks=seq(0.005,0.5,by=0.1),
+  #                      breaks = c(1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.005),
+  #                      labels = c("100 %","90 %","80 %","70 %","60 %","50 %", "40 %", "30 %", "20 %", "10 %", "< 0.5 %"),
+  #                      oob=squish) + 
+  scale_y_discrete(limits = rev(levels(Mucosa_group_Breadth_df$bins))) +
+  ylab(NULL) +  
+  xlab(NULL) + 
+  theme_classic() + 
+  guides(fill = guide_colourbar(barwidth = 1,
+                                barheight = 10,
+                                title = "Breadth of coverage",
+                                ticks = TRUE,
+                                ticks.colour = "white",
+                                ticks.linewidth = 0.5)) +
+  theme(text = element_text(size = 12),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y =  element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "black")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text=element_text(size=12)) + 
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,1,1), "cm")) +
+  force_panelsizes(cols = unit(c(8,4,4,8,8,4,1.5,4,2), "cm"), 
+                 TRUE)
+
+
+# plot ANI dendrogram 
+dend_ob <- dendro_data(as.dendrogram(Mucosa_group_hc),type = "rectangle")
+
+Mucosa_group_ANI_dendrogram <- ggplot(segment(dend_ob)) + 
+         geom_segment(aes(x = x, y = y, xend = xend, yend = yend), linewidth = 1) + 
+         coord_flip() + 
+         scale_y_reverse(expand = c(0.2, 0)) +
+         scale_x_reverse() +
+         theme_classic() +
+         theme(axis.ticks.y = element_blank(),
+               axis.ticks.x=element_blank(),
+               axis.text.x = element_blank(),
+               axis.text.y =  element_blank(),
+               axis.line.x = element_blank(),
+               axis.line.y = element_blank(),
+               axis.title.y = element_blank(),
+               axis.title.x = element_blank()) +
+         theme(panel.spacing.x=unit(0.1, "lines"),
+               plot.margin=unit(c(0,0,0,0), "cm"))
+  
+
+# Combine Breadth heatmap with ANI heatmap and dedrogram
+long_df_Mucosa_group$key <- as.factor(long_df_Mucosa_group$key)
+
+# Order based on hclust of ANI results
+Mucosa_group_hc_order <- data.frame(order = Mucosa_group_hc$labels[Mucosa_group_hc$order])
+long_df_Mucosa_group$key <- factor(long_df_Mucosa_group$key, levels = rev(Mucosa_group_hc_order$order))
+long_df_Mucosa_group$y <- factor(long_df_Mucosa_group$y, levels = rev(Mucosa_group_hc_order$order))
+
+
+ANI_plot <- ggplot(long_df_Mucosa_group, aes(key,y)) +
+  geom_tile(aes(fill = z)) + 
+  scale_fill_gradient2(low = "blue",
+                       mid = "lightgray",
+                       high = "red",
+                       midpoint = 0.95,
+                       limits =c(0.925, 1),
+                       na.value="darkblue",
+                       name = "ANI (%)")+
+  ylab("") +  
+  xlab("") + 
+  theme_classic() + 
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(color = "black", size = 10),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.margin=unit(c(0,0,0,0), "cm"),
+        legend.position = "top", 
+        legend.direction = "horizontal") 
+ 
+
+Empty_plot <- ggplot() + theme_void()
+
+Mucosa_group_final <- egg::ggarrange(Empty_plot,Empty_plot,percent_reads_mapped_plot,
+                                       Empty_plot,Empty_plot,total_reads_mapped_plot,
+                                       Empty_plot,Empty_plot, total_reads_plot,
+                                       Mucosa_group_ANI_dendrogram,ANI_plot,Mucosa_group_breadth_heatmap,
+          ncol = 3,
+          nrow = 4,
+          heights = c(0.1,0.1,0.1,1),
+          widths  = c(0.15,0.75,2))
+
+
+# save Final plot (Will need editing in Adobe Illustrator)
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Mucosa_group_final.pdf",Mucosa_group_final, width = 32, height = 15)
+  
+
+```
+
+
+###### BoC tree
+
+```{r}
+
+Mucosa_group_wide_breadth <- Mucosa_group_Breadth_df %>% 
+  dplyr::select(bins, layers, value) %>% 
+  pivot_wider(names_from = layers, values_from = value) %>% 
+  as.data.frame()
+
+# rename row names to species IDs
+Mucosa_group_wide_breadth_2 <- Mucosa_group_wide_breadth[,-1]
+rownames(Mucosa_group_wide_breadth_2) <- Mucosa_group_wide_breadth[,1]
+
+# Convert to matrix object
+Mucosa_group_wide_breadth_2_matrix <- as.matrix(Mucosa_group_wide_breadth_2)
+
+# Calculate Euclidean distance among samples
+Mucosa_group_breadth_Euclidean_distances <- vegan::vegdist(Mucosa_group_wide_breadth_2_matrix, method = "euclidean")
+
+  
+# Hierarchical clustering using Complete Linkage
+Mucosa_group_breadth_HC_Euclidean_distances <- hclust(Mucosa_group_breadth_Euclidean_distances, method = "ward.D" )
+
+# create dedrogram object
+Mucosa_group_breadth_HC_Euclidean_distances_dendrogram <- as.dendrogram(Mucosa_group_breadth_HC_Euclidean_distances)
+
+# Save HC tree
+Mucosa_group_breadth_HC_Euclidean_distances_tree <- as.phylo(Mucosa_group_breadth_HC_Euclidean_distances) 
+write.tree(Mucosa_group_breadth_HC_Euclidean_distances_tree, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_breadth_HC_Euclidean_distances.newick") # look for the file in your working directory
+
+```
+
+
+###### ANI-BoC tanglegram
+
+ANI Percent Identity
+
+```{r}
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+
+# Load ANI tree
+Mucosa_ANI_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_ANI_HC_Euclidean_distances.newick")
+
+# Load Breadth HC tree
+Mucosa_Breadth_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_breadth_HC_Euclidean_distances.newick")
+
+# convert to dendrogram objects
+Mucosa_dend_Breadth_tree <- ape::chronos(Mucosa_Breadth_tree)
+Mucosa_dend_Breadth_tree_2 <- as.dendrogram.phylo(Mucosa_dend_Breadth_tree)
+Mucosa_dend_ANI_tree <- ape::chronos(Mucosa_ANI_tree)
+Mucosa_dend_ANI_tree_2 <- as.dendrogram.phylo(Mucosa_dend_ANI_tree)
+
+# make dendrogram list; second dedrogram will be fixed
+Mucosa_DEND_LIST_ANI_vs_BOC <- dendlist(Mucosa_dend_ANI_tree_2,Mucosa_dend_Breadth_tree_2) 
+
+# Untangle
+entanglement(Mucosa_DEND_LIST_ANI_vs_BOC %>% dendextend::untangle(method="labels"))
+entanglement(Mucosa_DEND_LIST_ANI_vs_BOC %>% dendextend::untangle(method="ladderize"))
+entanglement(Mucosa_DEND_LIST_ANI_vs_BOC %>% dendextend::untangle(method="random"))
+entanglement(Mucosa_DEND_LIST_ANI_vs_BOC %>% dendextend::untangle(method="step1side"))
+entanglement(Mucosa_DEND_LIST_ANI_vs_BOC %>% dendextend::untangle(method="step2side"))
+entanglement(Mucosa_DEND_LIST_ANI_vs_BOC %>% dendextend::untangle(method="DendSer"))
+
+Mucosa_ANI_vs_BOC_TANGLEGRAM <- Mucosa_DEND_LIST_ANI_vs_BOC %>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_ANI_vs_BOC_tanglegram.pdf", width = 10, height = 8) 
+
+Mucosa_ANI_vs_BOC_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                                  highlight_distinct_edges=FALSE,
+                                  common_subtrees_color_branches=FALSE,
+                                  highlight_branches_lwd=FALSE,
+                                  lwd=3, 
+                                  lab.cex = 0.65, edge.lwd = 2, 
+                                  margin_inner = 20, 
+                                  columns_width = c(1, 0.5, 1), 
+                                  axes=FALSE,
+                                  color_lines = "black",
+                                  main = paste("entanglement =",
+                                               round(entanglement(Mucosa_ANI_vs_BOC_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+```
+
+
+###### ANI & DoC
+
+ANI Percent Identity
+```{r}
+
+# packages
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(phytools)
+library(tibble)
+library(dendextend)
+library(ape)
+library(dplyr)
+library(ggdendro)
+library(scales)
+library(ggh4x)
+
+
+
+
+Depth_df <- read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Strain_level_updated_Q2Q3_mean_coverage_data.csv", header = TRUE)
+
+# filter for subflava group genomes
+Mucosa_group_Depth_df <- Depth_df %>% 
+  filter(bins %in% Mucosa_group) 
+
+Mucosa_group_Depth_df$bins <- as.factor(Mucosa_group_Depth_df$bins)
+
+# Order based on hclust of ANI results
+Mucosa_group_hc_order <- data.frame(order = Mucosa_group_hc$labels[Mucosa_group_hc$order])
+Mucosa_group_Depth_df$bins <- factor(Mucosa_group_Depth_df$bins, levels = Mucosa_group_hc_order$order)
+
+# specify order for site terms
+Mucosa_group_Depth_df$site <- factor(Mucosa_group_Depth_df$site, levels = c("SUPP", "SUBP", "KG", "BM", "TD", "PT", "HP", "TH", "SV"))
+
+# set colors for heat map
+paleta_new = rev(RColorBrewer::brewer.pal(n = 11, name = "RdYlBu"))
+
+# Colors, including gray for the first segment
+colors <- c("gray", paleta_new)
+
+# Set up bar positioning for plots
+dodge <- position_dodge(width=0.9)
+
+# total_reads_mapped_plot
+total_reads_mapped_plot <- ggplot(data = Mucosa_group_Depth_df, aes(x=reorder(layers, -total_number_reads), y=total_reads_mapped)) + 
+  geom_bar(stat = 'identity',position = dodge, color = "darkblue") +
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") +
+  scale_y_continuous(expand = c(0, 0), limits=c(0, 25000000), breaks=seq(0,25000000,by=25000000), oob=squish, labels = scales::comma) +
+  #coord_cartesian(ylim=c(0,100000000)) +
+  xlab(NULL)+
+  ylab(expression(atop("No. of reads mapped", "(0 - 25 million)"))) +  # Modified y-axis label
+  theme_classic() + 
+  theme(text = element_text(size = 8),
+        axis.ticks.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(angle = -270, vjust = 0.5, hjust = 0.5),  # Try -90 degrees rotation
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "lightblue")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,-0.001,1), "cm"))+
+  force_panelsizes(cols = unit(c(8,4,4,8,8,4,1.5,4,2), "cm"), 
+                   TRUE)
+
+# total_reads_plot
+total_reads_plot <- ggplot(data = Mucosa_group_Depth_df, aes(x=reorder(layers, -total_number_reads), y=total_number_reads)) + 
+  geom_bar(stat = 'identity',position = dodge, color = "darkblue") +
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") +
+  scale_y_continuous(expand = c(0, 0), limits=c(0, 200000000), breaks=seq(0,200000000,by=200000000), oob=squish, labels = scales::comma) +
+  #coord_cartesian(ylim=c(0,100000000)) +
+  xlab(NULL)+
+  ylab(expression(atop("Total reads", "(0 - 200 million)"))) +  # Modified y-axis label
+  theme_classic() + 
+  theme(text = element_text(size = 8),
+        axis.ticks.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x = element_blank(),
+        axis.text.y=element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(angle = -270, vjust = 0.5, hjust = 0.5),  # Try -90 degrees rotation
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "lightblue")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,-0.001,1), "cm"))+
+  force_panelsizes(cols = unit(c(8,4,4,8,8,4,1.5,4,2), "cm"), 
+                   TRUE)
+
+# percent_reads_mapped_plot
+percent_reads_mapped_plot <- ggplot(data = Mucosa_group_Depth_df, aes(x=reorder(layers, -total_number_reads), y=percent_reads_mapped)) + 
+  geom_bar(stat = 'identity',position = dodge, color = "darkblue") +
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") +
+  scale_y_continuous(expand = c(0, 0), limits=c(0, 50), breaks=seq(0,50,by=50), oob=squish, labels = scales::comma) +
+  #coord_cartesian(ylim=c(0,100000000)) +
+  xlab(NULL)+
+  ylab(expression(atop("Percent reads mapped", "(0 - 50 %)"))) +  # Modified y-axis label
+  theme_classic() + 
+  theme(text = element_text(size = 8),
+        axis.ticks.y = element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(angle = -270, vjust = 0.5, hjust = 0.5),  # Try -90 degrees rotation
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "lightblue")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,-0.001,1), "cm"))+
+  force_panelsizes(cols = unit(c(8,4,4,8,8,4,1.5,4,2), "cm"), 
+                   TRUE)
+
+# Depth heatmap
+Mucosa_group_Depth_heatmap <- ggplot(data = Mucosa_group_Depth_df, aes(x=reorder(layers,-total_number_reads), y=bins, fill=value)) +
+  geom_tile(height=1, width=1) + 
+  facet_grid(. ~ site, scales = "free", space = "free", switch = "x") + 
+  scale_fill_gradientn(colours = colors,
+                       limits=c(0.25, 10),
+                       #breaks=seq(0.005,0.5,by=0.1),
+                       breaks = c(0.25, 1, 2, 4, 6, 8, 10),
+                       labels = c("< 0.25 X ","1 X", "2 X", "4 X", "6 X", "8 X", "> 10 X"),
+                       oob=squish) + 
+  scale_y_discrete(limits = rev(levels(Mucosa_group_Depth_df$bins))) +
+  ylab(NULL) +  
+  xlab(NULL) + 
+  theme_classic() + 
+  guides(fill = guide_colourbar(barwidth = 1,
+                                barheight = 10,
+                                title = "Depth of coverage",
+                                ticks = TRUE,
+                                ticks.colour = "white",
+                                ticks.linewidth = 0.5)) +
+  theme(text = element_text(size = 12),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y =  element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = "black")) + 
+  theme(strip.background = element_blank(),
+        panel.border = element_blank(),
+        strip.text=element_text(size=12)) + 
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(-0.001,1,1,1), "cm")) +
+  force_panelsizes(cols = unit(c(8,4,4,8,8,4,1.5,4,2), "cm"), 
+                   TRUE)
+
+
+# plot ANI dendrogram 
+dend_ob <- dendro_data(as.dendrogram(Mucosa_group_hc),type = "rectangle")
+
+Mucosa_group_ANI_dendrogram <- ggplot(segment(dend_ob)) + 
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), linewidth = 1) + 
+  coord_flip() + 
+  scale_y_reverse(expand = c(0.2, 0)) +
+  scale_x_reverse() +
+  theme_classic() +
+  theme(axis.ticks.y = element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y =  element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(0,0,0,0), "cm"))
+
+
+# Combine Depth heatmap with ANI heatmap and dedrogram
+long_df_Mucosa_group$key <- as.factor(long_df_Mucosa_group$key)
+
+# Order based on hclust of ANI results
+Mucosa_group_hc_order <- data.frame(order = Mucosa_group_hc$labels[Mucosa_group_hc$order])
+long_df_Mucosa_group$key <- factor(long_df_Mucosa_group$key, levels = rev(Mucosa_group_hc_order$order))
+long_df_Mucosa_group$y <- factor(long_df_Mucosa_group$y, levels = rev(Mucosa_group_hc_order$order))
+
+
+ANI_plot <- ggplot(long_df_Mucosa_group, aes(key,y)) +
+  geom_tile(aes(fill = z)) + 
+  scale_fill_gradient2(low = "blue",
+                       mid = "lightgray",
+                       high = "red",
+                       midpoint = 0.95,
+                       limits =c(0.9, 1),
+                       na.value="darkblue",
+                       name = "ANI (%)")+
+  ylab("") +  
+  xlab("") + 
+  theme_classic() + 
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(color = "black", size = 10),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.margin=unit(c(0,0,0,0), "cm"),
+        legend.position = "top", 
+        legend.direction = "horizontal") 
+
+
+Empty_plot <- ggplot() + theme_void()
+
+Mucosa_group_final_depth <- egg::ggarrange(Empty_plot,Empty_plot,percent_reads_mapped_plot,
+                                     Empty_plot,Empty_plot,total_reads_mapped_plot,
+                                     Empty_plot,Empty_plot, total_reads_plot,
+                                     Mucosa_group_ANI_dendrogram,ANI_plot,Mucosa_group_Depth_heatmap,
+                                     ncol = 3,
+                                     nrow = 4,
+                                     heights = c(0.1,0.1,0.1,1),
+                                     widths  = c(0.15,0.75,2))
+
+
+# save Final plot (Will need editing in Adobe Illustrator)
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Mucosa_group_final_depth.pdf",Mucosa_group_final_depth, width = 32, height = 15)
+
+
+```
+
+
+###### DoC tree
+
+```{r}
+
+Mucosa_group_wide_depth <- Mucosa_group_Depth_df %>% 
+  dplyr::select(bins, layers, value) %>% 
+  pivot_wider(names_from = layers, values_from = value) %>% 
+  as.data.frame()
+
+# rename row names to species IDs
+Mucosa_group_wide_depth_2 <- Mucosa_group_wide_depth[,-1]
+rownames(Mucosa_group_wide_depth_2) <- Mucosa_group_wide_depth[,1]
+
+# Convert to matrix object
+Mucosa_group_wide_depth_2_matrix <- as.matrix(Mucosa_group_wide_depth_2)
+
+# Calculate Euclidean distance among samples
+Mucosa_group_depth_Euclidean_distances <- vegan::vegdist(Mucosa_group_wide_depth_2_matrix, method = "euclidean")
+
+
+# Hierarchical clustering using Complete Linkage
+Mucosa_group_depth_HC_Euclidean_distances <- hclust(Mucosa_group_depth_Euclidean_distances, method = "ward.D" )
+
+# create dedrogram object
+Mucosa_group_depth_HC_Euclidean_distances_dendrogram <- as.dendrogram(Mucosa_group_depth_HC_Euclidean_distances)
+
+# Save HC tree
+Mucosa_group_depth_HC_Euclidean_distances_tree <- as.phylo(Mucosa_group_depth_HC_Euclidean_distances) 
+write.tree(Mucosa_group_depth_HC_Euclidean_distances_tree, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_depth_HC_Euclidean_distances.newick") # look for the file in your working directory
+
+```
+
+
+###### ANI-DoC tanglegram
+
+ANI Percent Identity
+```{r}
+
+# load libraries
+library(dendextend)
+library(ape)
+library(dplyr)
+library(phytools)
+library(phylogram)
+library(gplots)
+
+# Load ANI tree
+Mucosa_ANI_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_ANI_HC_Euclidean_distances.newick")
+
+# Load Depth HC tree
+Mucosa_Depth_tree <- read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_depth_HC_Euclidean_distances.newick")
+
+# convert to dendrogram objects
+Mucosa_dend_Depth_tree <- ape::chronos(Mucosa_Depth_tree)
+Mucosa_dend_Depth_tree_2 <- as.dendrogram.phylo(Mucosa_dend_Depth_tree)
+Mucosa_dend_ANI_tree <- ape::chronos(Mucosa_ANI_tree)
+Mucosa_dend_ANI_tree_2 <- as.dendrogram.phylo(Mucosa_dend_ANI_tree)
+
+# make dendrogram list; second dedrogram will be fixed
+Mucosa_DEND_LIST_ANI_vs_DOC<- dendlist(Mucosa_dend_ANI_tree_2,Mucosa_dend_Depth_tree_2) 
+
+# Untangle
+entanglement(Mucosa_DEND_LIST_ANI_vs_DOC%>% dendextend::untangle(method="labels"))
+entanglement(Mucosa_DEND_LIST_ANI_vs_DOC%>% dendextend::untangle(method="ladderize"))
+entanglement(Mucosa_DEND_LIST_ANI_vs_DOC%>% dendextend::untangle(method="random"))
+entanglement(Mucosa_DEND_LIST_ANI_vs_DOC%>% dendextend::untangle(method="step1side"))
+entanglement(Mucosa_DEND_LIST_ANI_vs_DOC%>% dendextend::untangle(method="step2side"))
+entanglement(Mucosa_DEND_LIST_ANI_vs_DOC%>% dendextend::untangle(method="DendSer"))
+
+Mucosa_ANI_vs_DOC_TANGLEGRAM <- Mucosa_DEND_LIST_ANI_vs_DOC%>% dendextend::untangle(method="step2side") 
+
+# plot tanglegram
+pdf(file = "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_ANI_vs_DOC_tanglegram.pdf", width = 10, height = 8) 
+
+Mucosa_ANI_vs_DOC_TANGLEGRAM %>% plot(common_subtrees_color_lines=FALSE,
+                                      highlight_distinct_edges=FALSE,
+                                      common_subtrees_color_branches=FALSE,
+                                      highlight_branches_lwd=FALSE,
+                                      lwd=3, 
+                                      lab.cex = 0.65, edge.lwd = 2, 
+                                      margin_inner = 20, 
+                                      columns_width = c(1, 0.5, 1), 
+                                      axes=FALSE,
+                                      color_lines = "black",
+                                      main = paste("entanglement =",
+                                                   round(entanglement(Mucosa_ANI_vs_DOC_TANGLEGRAM), 4)))
+
+
+
+dev.off()
+
+
+```
+
+
+###### ANI Full Percent Identity
+
+
+```{r}
+
+
+# packages
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(phytools)
+library(tibble)
+library(dendextend)
+library(ape)
+library(dplyr)
+
+# load ANI data
+df_full <-read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_full_percentage_identity.txt", header = TRUE)
+
+# load ANI tree
+df_full_newick <-  ape::read.tree("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/ANI/G_0213/ANIb_full_percentage_identity.newick")
+
+# order ANI data by ANI tree
+df_full_newick_orders <- phytools::compute.mr(df_full_newick, type = "matrix")
+df_full_newick_rownames <- rev(rownames(df_full_newick_orders))
+data_ordered <- df_full[ order(match(df_full$key, df_full_newick_rownames)), ]
+df_full_newick_rownames_df_full <- as.data.frame(df_full_newick_rownames)
+cols_A<- ncol(df_full) -1
+df_full_newick_rownames_df_full2 <- as.data.frame(matrix(df_full_newick_rownames_df_full$df_full_newick_rownames, ncol = cols_A, byrow = TRUE))
+names(df_full_newick_rownames_df_full2) <- df_full_newick_rownames_df_full2[1,]
+df_full_newick_rownames_df_full3 <- df_full_newick_rownames_df_full2[-1,]
+df_full_newick_rownames_df_full3 <- df_full_newick_rownames_df_full3 %>% 
+  add_column(key = NA, .before = 1)
+data_ordered2<-data_ordered[names(df_full_newick_rownames_df_full3)]
+
+cols2<- ncol(data_ordered2) 
+long_df_full <- reshape2::melt(data_ordered2,
+                          id.vars=c("key"),
+                          measure.vars=colnames(data_ordered2[2:cols2]),
+                          variable.name="y",
+                          value.name="z")
+mylevels1 <- df_full_newick$tip.label
+long_df_full$key <- factor(long_df_full$key,levels=mylevels1)
+long_df_full$y <- factor(long_df_full$y, levels=mylevels1)
+
+
+# Mucosa group
+Mucosa_group <- long_df_full$key[44:73]
+
+# Subset data frame
+long_df_full_Mucosa_group <- long_df_full %>% 
+  filter(key %in% Mucosa_group) %>% 
+  filter(y %in% Mucosa_group)
+
+
+# Density plot
+ggplot(long_df_full_Mucosa_group, aes(x = z)) + 
+  geom_density(fill = "blue", alpha = 0.5, adjust = 0.01) +  # Add the density plot
+  geom_rug(color = "red") +  # Add rug plot with points along the x-axis
+  ggtitle("Density of Z Values with Data Points") +
+  xlab("Z Values") +
+  ylab("Density") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", color = "red")
+
+# Histogram
+# Add a new column to the data frame categorizing the 'z' values
+long_df_full_Mucosa_group$color_group <- ifelse(long_df_full_Mucosa_group$z < 0.75, "< 0.75", ">= 0.75")
+
+# Create the histogram for the 'z' variable with conditional coloring
+ggplot(long_df_full_Mucosa_group, aes(x = z, fill = color_group)) + 
+  geom_histogram(binwidth = 0.001, color = "black", linewidth = 0.5) + 
+  scale_fill_manual(values = c("< 0.75" = "blue", ">= 0.75" = "red")) +
+  ggtitle("Histogram of ANI Values (binwidth = 0.001 )") +
+  xlab("ANI Values") +
+  ylab("Count") +
+  theme_minimal() +  # Optional: Adds a minimalistic theme to the plot
+  geom_vline(xintercept = 0.75, linetype = "dashed", color = "black") + 
+  geom_rug(color = "black", alpha = 0.5)  # Add rug plot with points along the x-axis
+
+# save plot
+
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_FULL_ANI_histogram.pdf", plot = last_plot(), width = 5, height = 3)
+
+
+# Hclust based on euclidian distances and ward linkage
+
+# Convert to wide format
+wide_df_full_Mucosa_group <- long_df_full_Mucosa_group %>% 
+  dplyr::select(key, y, z) %>% 
+  pivot_wider(names_from = key, values_from = z)
+
+
+# Convert tibble to data frame object
+wide_df_full_Mucosa_group_df_full <- as.data.frame(wide_df_full_Mucosa_group)
+
+# Rename row names to species IDs
+wide_df_full_Mucosa_group_df_full2 <- wide_df_full_Mucosa_group_df_full[,-1]
+rownames(wide_df_full_Mucosa_group_df_full2) <- wide_df_full_Mucosa_group_df_full[,1]
+
+# Reformat to matrix
+Mucosa_group_matrix_FULL_ANI <- as.matrix(wide_df_full_Mucosa_group_df_full2)
+
+
+# Calculate Euclidean distance among genomes
+Mucosa_group_distances_FULL_ANI <- vegan::vegdist(Mucosa_group_matrix_FULL_ANI, method = "euclidian")
+
+
+# Hierarchical clustering using Ward Linkage
+Mucosa_group_hc_FULL_ANI <- hclust(Mucosa_group_distances_FULL_ANI, method = "ward.D" )
+
+# Save Mucosa ANI tree
+Mucosa_group_FULL_ANI_HC_Euclidean_distances_tree <- as.phylo(Mucosa_group_hc_FULL_ANI) 
+write.tree(Mucosa_group_FULL_ANI_HC_Euclidean_distances_tree, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_group_FULL_ANI_HC_Euclidean_distances.newick") # look for the file in your working directory
+
+
+# plot ANI dendrogram 
+Mucosa_group_FULL_ANI_dend_ob <- dendro_data(as.dendrogram(Mucosa_group_hc_FULL_ANI),type = "rectangle")
+
+Mucosa_group_FULL_ANI_dendrogram <- ggplot(segment(Mucosa_group_FULL_ANI_dend_ob)) + 
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), linewidth = 1) + 
+  coord_flip() + 
+  scale_y_reverse(expand = c(0.2, 0)) +
+  scale_x_reverse() +
+  theme_classic() +
+  theme(axis.ticks.y = element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y =  element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank()) +
+  theme(panel.spacing.x=unit(0.1, "lines"),
+        plot.margin=unit(c(0,0,0,0), "cm"))
+
+# save dend plot
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Mucosa_group_FULL_ANI_dendrogram.pdf",Mucosa_group_FULL_ANI_dendrogram, width = 5, height = 7)
+
+
+# ANI heatmap 
+long_df_full_Mucosa_group$key <- as.factor(long_df_full_Mucosa_group$key)
+
+# Order based on hclust of ANI results
+Mucosa_group_hc__FULL_ANI_order <- data.frame(order = Mucosa_group_hc_FULL_ANI$labels[Mucosa_group_hc_FULL_ANI$order])
+long_df_full_Mucosa_group$key <- factor(long_df_full_Mucosa_group$key, levels = rev(Mucosa_group_hc__FULL_ANI_order$order))
+long_df_full_Mucosa_group$y <- factor(long_df_full_Mucosa_group$y, levels = rev(Mucosa_group_hc__FULL_ANI_order$order))
+
+
+Mucosa_FULL_ANI_plot <- ggplot(long_df_full_Mucosa_group, aes(key,y)) +
+  geom_tile(aes(fill = z)) + 
+  scale_fill_gradient2(low = "blue",
+                       mid = "lightgray",
+                       high = "red",
+                       midpoint = 0.75,
+                       limits =c(0.5, 1),
+                       na.value="darkblue",
+                       name = "ANI Full Perecent Identity")+
+  ylab("") +  
+  xlab("") + 
+  theme_classic() + 
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(color = "black", size = 10),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.margin=unit(c(0,0,0,0), "cm"),
+        legend.position = "top", 
+        legend.direction = "horizontal") 
+
+
+
+Mucosa_FULL_ANI_plot_final <- egg::ggarrange(Mucosa_group_FULL_ANI_dendrogram, Mucosa_FULL_ANI_plot,
+                                        ncol = 2,
+                                        nrow = 1,
+                                        widths  = c(0.15,1))
+
+
+ggsave("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Mucosa_group_FULL_ANI_heatmap.pdf", Mucosa_FULL_ANI_plot_final, width = 10, height = 8)
+
+
+
+```
+
+
+##### Group N. subflava genomes
+
+
+```{r}
+
+# Load data
+N_subflava_groups <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Subflava_ANI_hcut_optimal_clusters.txt", sep = "\t", header = TRUE)
+
+# Set variables as factors
+N_subflava_groups$ANI_and_Phylogeny_based_Cluster <- as.factor(N_subflava_groups$ANI_and_Phylogeny_based_Cluster)
+N_subflava_groups$Pangenome_ID <- as.factor(N_subflava_groups$Pangenome_ID)
+
+# Rename groups
+N_subflava_groups <- N_subflava_groups %>% 
+  mutate(Group_ID = case_when(grepl('1', ANI_and_Phylogeny_based_Cluster) ~ 'N_subflava_I',
+                              grepl('2', ANI_and_Phylogeny_based_Cluster) ~ 'N_subflava_II', 
+                              grepl('3', ANI_and_Phylogeny_based_Cluster) ~ 'N_subflava_III', 
+                              grepl('4', ANI_and_Phylogeny_based_Cluster) ~ 'N_subflava_IV', 
+                              grepl('5', ANI_and_Phylogeny_based_Cluster) ~ 'N_subflava_V', 
+                              grepl('6', ANI_and_Phylogeny_based_Cluster) ~ 'N_subflava_VI', 
+                              grepl('7', ANI_and_Phylogeny_based_Cluster) ~ 'N_subflava_VII',
+                              grepl('8', ANI_and_Phylogeny_based_Cluster) ~ 'N_subflava_VIII',
+                              grepl('9', ANI_and_Phylogeny_based_Cluster) ~ 'N_subflava_IX'))
+
+N_subflava_groups_renamed <- N_subflava_groups %>% 
+  dplyr::select(Pangenome_ID,Group_ID)
+
+```
+
+
+##### Group N. mucosa genomes
+
+```{r}
+
+# Load data
+N_mucosa_groups <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Mucosa_ANI_hcut_optimal_clusters.txt", sep = "\t", header = TRUE)
+
+# Set variables as factors
+N_mucosa_groups$ANI_and_Phylogeny_based_Cluster <- as.factor(N_mucosa_groups$ANI_and_Phylogeny_based_Cluster)
+N_mucosa_groups$Pangenome_ID <- as.factor(N_mucosa_groups$Pangenome_ID)
+
+# Rename groups
+N_mucosa_groups <- N_mucosa_groups %>% 
+  mutate(Group_ID = case_when(grepl('1', ANI_and_Phylogeny_based_Cluster) ~ 'N_mucosa_I',
+                              grepl('2', ANI_and_Phylogeny_based_Cluster) ~ 'N_mucosa_II', 
+                              grepl('3', ANI_and_Phylogeny_based_Cluster) ~ 'N_mucosa_III', 
+                              grepl('4', ANI_and_Phylogeny_based_Cluster) ~ 'N_mucosa_IV', 
+                              grepl('5', ANI_and_Phylogeny_based_Cluster) ~ 'N_mucosa_V', 
+                              grepl('6', ANI_and_Phylogeny_based_Cluster) ~ 'N_mucosa_VI', 
+                              grepl('7', ANI_and_Phylogeny_based_Cluster) ~ 'N_mucosa_VII'))
+
+N_mucosa_groups_renamed <- N_mucosa_groups %>% 
+  dplyr::select(Pangenome_ID,Group_ID)
+
+```
+
+
+##### Group remaining genomes
+
+```{r}
+
+# Get list of pangenome IDs.
+
+Mean_Q2Q3_coverage_depth <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Neisseriaceae_Q2Q3_coverage_genomeIDs.txt", header = TRUE)
+
+Pangenome_IDs <- Mean_Q2Q3_coverage_depth %>% 
+  dplyr::select(genomeIDs) %>% 
+  dplyr::rename(Pangenome_ID = genomeIDs)
+  
+
+# Combine list with N. subflava and N. mucosa group IDs.
+N_subflava_and_mucosa_groups <- rbind(N_subflava_groups_renamed, N_mucosa_groups_renamed)
+Groups <- merge(Pangenome_IDs, N_subflava_and_mucosa_groups, by = "Pangenome_ID", all.x = TRUE)
+Groups$Pangenome_ID <- as.factor(Groups$Pangenome_ID)
+
+# Manually fill in remaining group IDs for each species.
+Final_Groups <- Groups %>% 
+  mutate(Group_ID = case_when(grepl('E_corrodens', Pangenome_ID) ~ 'E_corrodens',
+                              grepl('E_sp_str_HMSC073A11_id_GCA_001815545_1', Pangenome_ID) ~ 'E_corrodens', 
+                              grepl('E_exigua', Pangenome_ID) ~ 'E_exigua', 
+                              grepl('E_sp_str_NML96_A_049_id_GCA_001648495_1', Pangenome_ID) ~ 'E_exigua', 
+                              grepl('E_sp_str_NML03_A_027_id_GCA_001648395_1', Pangenome_ID) ~ 'E_exigua', 
+                              grepl('E_halliae', Pangenome_ID) ~ 'E_halliae', 
+                              grepl('E_corrodens_str_KCOM_3110_id_GCA_003990355_1', Pangenome_ID) ~ 'E_halliae',
+                              grepl('E_glucosivorans_str_S3360_id_GCA_016025525_2', Pangenome_ID) ~ 'E_glucosivorans',
+                              grepl('E_sp_str_Marseille_P7795_id_GCA_916618725_1', Pangenome_ID) ~ 'E_glucosivorans',
+                              grepl('K_sp_str_SNUBH_2017_id_GCA_028680565_1', Pangenome_ID) ~ 'K_sp_str_SNUBH_2017',
+                              grepl('K_potus_str_NCTC13336_id_GCA_900451175_1', Pangenome_ID) ~ 'K_potus',
+                              grepl('N_sp_HMT_020_str_F0370_id_GCA_000318235_2', Pangenome_ID) ~ 'N_sp_HMT_020',
+                              grepl('K_bonacorsii_str_Marseille_Q4569_id_GCA_016623605_1', Pangenome_ID) ~ 'K_bonacorsii_oralis',
+                              grepl('K_oralis_str_ATCC_51147_id_GCA_000160435_1', Pangenome_ID) ~ 'K_bonacorsii_oralis',
+                              grepl('K_denitrificans', Pangenome_ID) ~ 'K_denitrificans',
+                              grepl('K_kingae', Pangenome_ID) ~ 'K_kingae',
+                              grepl('K_negevensis', Pangenome_ID) ~ 'K_negevensis',
+                              grepl('N_bacilliformis', Pangenome_ID) ~ 'N_bacilliformis',
+                              grepl('N_basseii', Pangenome_ID) ~ 'N_basseii',
+                              grepl('N_benedictiae', Pangenome_ID) ~ 'N_benedictiae',
+                              grepl('N_bergeri', Pangenome_ID) ~ 'N_bergeri',
+                              grepl('N_blantyrii', Pangenome_ID) ~ 'N_blantyrii',
+                              grepl('N_brasiliensis', Pangenome_ID) ~ 'N_brasiliensis',
+                              grepl('N_perflava_str_327A_id_GCA_024170405_1', Pangenome_ID) ~ 'N_brasiliensis',
+                              grepl('N_cinerea', Pangenome_ID) ~ 'N_cinerea',
+                              grepl('N_cinerea', Pangenome_ID) & !grepl('N_cinerea_str_CCUG_5746_id_GCA_963394885_1', Pangenome_ID) ~ 'N_cinerea',
+                              grepl('N_cinerea_str_CCUG_5746_id_GCA_963394885_1', Pangenome_ID) ~ 'N_cinerea_str_CCUG_5746',
+                              grepl('N_dentiae', Pangenome_ID) ~ 'N_dentiae',
+                              grepl('N_sp_str_Marseille_Q6792_id_GCA_943181435_1', Pangenome_ID) ~ 'N_cinerea_str_CCUG_5746',
+                              grepl('N_sp_str_GCGS211_id_GCA_001308005_1', Pangenome_ID) ~ 'N_dumasiana',
+                              grepl('N_dumasiana', Pangenome_ID) ~ 'N_dumasiana',
+                              grepl('N_elongata', Pangenome_ID) ~ 'N_elongata',
+                              grepl('N_sp_str_HMSC31F04_id_GCA_001807735_1', Pangenome_ID) ~ 'N_elongata',
+                              grepl('N_gonorrhoeae', Pangenome_ID) ~ 'N_gonorrhoeae',
+                              grepl('N_lactamica', Pangenome_ID) & !grepl('N_lactamica_str_338_rep1_NLAC_id_GCA_001064605_1', Pangenome_ID) & !grepl('N_lactamica_str_NS19_id_GCA_000193795_2', Pangenome_ID) ~ 'N_lactamica',
+                              grepl('N_lactamica_str_NS19_id_GCA_000193795_2', Pangenome_ID) ~ 'N_lactamica_str_NS19',
+                              grepl('N_maigaei', Pangenome_ID) ~ 'N_maigaei',
+                              grepl('N_meningitidis', Pangenome_ID) ~ 'N_meningitidis',
+                              grepl('N_sp_str_HMSC070F02_id_GCA_001814225_1', Pangenome_ID) ~ 'N_meningitidis',
+                              grepl('N_oralis_str_CCUG_26878_id_GCA_963394915_1', Pangenome_ID) ~ 'N_oralis',
+                              grepl('N_sp_str_F0314_id_GCA_005886145_1', Pangenome_ID) ~ 'N_oralis',
+                              grepl('N_polysaccharea', Pangenome_ID) ~ 'N_polysaccharea',
+                              grepl('N_shayeganii', Pangenome_ID) ~ 'N_shayeganii',
+                              grepl('N_uirgultaei', Pangenome_ID) ~ 'N_uirgultaei',
+                              grepl('N_viridiae', Pangenome_ID) ~ 'N_viridiae',
+                              grepl('N_wadsworthii', Pangenome_ID) ~ 'N_wadsworthii',
+                              grepl('N_sp_str_GCGS229_id_GCA_001308015_1', Pangenome_ID) ~ 'N_wadsworthii',
+                              grepl('N_weaveri', Pangenome_ID) ~ 'N_weaveri',
+                              grepl('S_muelleri', Pangenome_ID) ~ 'S_muelleri',
+                              grepl('N_sp_str_3986_id_GCA_028776105_1', Pangenome_ID) ~ 'N_sp_str_3986_and_str_51_81',
+                              grepl('N_sp_str_51_81_id_GCA_028776585_1', Pangenome_ID) ~ 'N_sp_str_3986_and_str_51_81',
+                              grepl('N_sp_str_HSC_16F19_id_GCA_024171525_1', Pangenome_ID) ~ 'N_sp_str_HSC_16F19',
+                              grepl('N_sp_str_MVDL20_010259_id_GCA_030504595_1', Pangenome_ID) ~ 'N_sp_str_MVDL20_010259',
+                              TRUE ~ Group_ID))
+                             
+ 
+write.table(Final_Groups, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Neisseriaceae_genome_groups.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+```
+
+

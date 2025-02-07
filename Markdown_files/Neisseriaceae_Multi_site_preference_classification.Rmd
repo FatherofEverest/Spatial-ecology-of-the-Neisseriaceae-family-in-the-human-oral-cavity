@@ -1,0 +1,1054 @@
+---
+title: "Untitled"
+author: "J. J. Giacomini"
+date: "2025-02-07"
+output: html_document
+---
+
+We adapted a previously developed classification algorithm (Eren el al 2014) to associate each species or subgroup with one or more sampling sites where that clade is most differentially abundant or prevalent. Briefly, the algorithm creates a list of all possible binary mappings of eight sampling sites (BM, KG, PT, SUBP, SUPP, SV, TD, and TH) to generate all two-group combinations of sampling sites. It then tests whether the central tendencies of group 1 and group 2 differ significantly. For the abundance metric, we summed the mean Q2Q3 coverage for each genome within a species' clade and used a Student's T-test to calculate the T statistic for each map. For the prevalence metric, we selected the maximum breadth of coverage value from the set of genomes for each species' clade and estimated a binary detection value for each sample based on a 50% breadth of coverage threshold. We then modeled prevalence using a generalized linear model fit with a binomial distribution to calculate the Rao statistic for each map. For both the abundance- and prevalence-based classification methods, the map that yielded the largest absolute test statistic was used to associate the species clade with the sampling site(s).
+
+*Eren AM, Borisy GG, Huse SM, Mark Welch JL. 2014. Oligotyping analysis of the human oral microbiome. Proc Natl Acad Sci 111:E2875–E2884.*
+
+##### T-TEST Classify site preferences per group
+
+Now we can run the script to classify groups by mean Q2Q3 depth of coverage.
+
+```{bash}
+
+cd /Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/With_HP
+Rscript JJG_groupID_to_sites_Q2Q3_coverage.R
+
+
+cd /Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP
+Rscript JJG_groupID_to_sites_Q2Q3_coverage_no_HP.R
+
+```
+
+
+
+##### T-stat distribution
+
+```{r}
+
+library(gt)
+library(dplyr)
+library(ggplot2)
+
+
+
+data <- as.data.frame(read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Neisseriaceae_mean_Q2Q3_coverage_per_group_no_HP.txt", header=TRUE, sep="\t", fileEncoding="UTF-8"))
+
+groups <- data$groupIDs
+
+for(focal_group in groups){
+    
+  print(paste0("Working on ",focal_group))
+  
+  # Load data
+  group_results <- read.csv(paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/",focal_group,"_Q2Q3_mean_coverage_full_results.csv"), header = TRUE)
+  
+  # t stat rank order
+  group_results_ordered <- group_results %>% 
+    filter(T > 0) %>% 
+    arrange(desc(T)) %>% 
+    mutate(T_rank = seq_along(T))
+  
+  # t-stat summary stats
+  t_summary <- group_results_ordered %>% 
+    summarise(Min = min(T),
+              Median = median(T),
+              Mean = mean(T),
+              Max = max(T),
+              SD = sd(T),
+              N = n(),
+              SE = SD/sqrt(N))
+  
+  # t stat density plot
+  t_density_plot <- ggplot(group_results_ordered, aes(x = T)) + 
+    geom_density(fill = "blue", alpha = 0.5) + 
+    labs(title = NULL, x = "T") +
+    theme_minimal()
+  
+  # t-stat log-log rank order plot
+  group_results_ordered$log_ranks <- log(group_results_ordered$T_rank)
+  t_log_log_rank_order_plot <- ggplot(group_results_ordered, aes(x = log_ranks, y = T)) +
+    geom_point() + # Add points
+    geom_line() + # Connect points with lines +
+    geom_hline(yintercept = 3.291, linetype = "dashed", color = "red") +
+    labs(title = NULL, x = "log(Rank)", y = "T") +
+    theme_minimal() # Use a minimal theme for aesthetics
+  
+  
+  # Save tables and plots
+  write.table(t_summary, paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/",focal_group,"_t_summary_table.txt"),row.names = FALSE, quote = FALSE, sep = "\t")
+  
+  ggsave(paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/",focal_group,"_t_density_plot.pdf"),t_density_plot,  width = 5, height = 4)
+  
+  ggsave(paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/",focal_group,"_t_log_log_rank_order_plot.pdf"),t_log_log_rank_order_plot, width = 5, height = 4)
+
+  
+  print(paste0("***** Done with ",focal_group, " *****"))
+  
+}   
+
+
+
+
+
+```
+
+When a step-like pattern appears in a log-log rank order plot, it typically indicates a discrete or quantized nature of the data values rather than a smooth continuous distribution. This pattern can arise from several underlying causes or characteristics of the dataset:
+
+Quantization of Data Values: The data values themselves might be occurring in discrete steps or quantized levels. For example, in a dataset measuring some quantity in integers or fixed decimal places, the log transformation can accentuate the appearance of these discrete steps.
+
+Clustering of Values: The data may have natural clusters or groups of values that are relatively common, causing jumps in the rank when sorted. This is especially noticeable on a log scale, where differences between small numbers are magnified.
+
+
+##### Greedy-forward method
+
+```{r}
+
+data <- as.data.frame(read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Neisseriaceae_mean_Q2Q3_coverage_per_group_no_HP.txt", header=TRUE, sep="\t", fileEncoding="UTF-8"))
+
+
+# Rename row names to species IDs
+data_2 <- data[,-1]
+rownames(data_2) <- data[,1]
+
+# Assuming 'data' is a data frame where rows represent bacterial groups,
+# and columns represent different oral sites with their Q2Q3 coverage values
+
+greedy_results <- list()
+
+for (group in rownames(data_2)) {
+  # Calculate total coverage for the group
+  total_coverage <- sum(data_2[group, ])
+  
+  # Calculate percentage coverage for each site
+  percent_coverage <- data_2[group, ] / total_coverage * 100
+  
+  # Sort sites by their percentage coverage in descending order
+  sorted_sites <- sort(percent_coverage, decreasing = TRUE)
+  
+  # Initialize cumulative sum and selected sites
+  cumulative_sum <- 0
+  selected_sites <- c()
+  
+  # Greedy-forward selection
+  for (site in names(sorted_sites)) {
+    cumulative_sum <- cumulative_sum + sorted_sites[site]
+    selected_sites <- c(selected_sites, site)
+    if (cumulative_sum >= 90) break
+  }
+  
+  # Store the results
+  greedy_results[[group]] <- selected_sites
+}
+
+# results is a list where each element is a vector of selected sites for each group
+
+
+```
+
+```{r}
+library(tidyverse)
+
+# Load the data
+raw_data_wide <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Neisseriaceae_sum_Q2Q3_coverage_per_group_no_HP.txt", sep = "\t", header = TRUE)
+
+
+long_data <- raw_data_wide %>%
+  pivot_longer(cols = -site, names_to = "Species", values_to = "Coverage") %>%
+  rename(OralSite = site) # Renaming the site column to OralSite for clarity
+
+# Group by Species, then OralSite, and summarize to find total coverage
+species_coverage_summary <- long_data %>%
+  group_by(Species, OralSite) %>%
+  summarise(TotalCoverage = sum(Coverage, na.rm = TRUE), .groups = 'drop') # Ensure NA values in Coverage are handled
+
+# Initialize an empty list to store preferred sites for each species
+preferred_sites_per_species <- list()
+
+for(species in unique(species_coverage_summary$Species)) {
+  species_data <- filter(species_coverage_summary, Species == species)
+  total_species_coverage <- sum(species_data$TotalCoverage)
+  
+  # Skip species with no coverage data or total coverage of zero
+  if(is.na(total_species_coverage) || total_species_coverage == 0) next
+  
+  # Sort sites for this species by descending coverage
+  species_data <- species_data %>%
+    arrange(desc(TotalCoverage))
+  
+  cumulative_coverage <- 0
+  preferred_sites <- c()
+  
+  for(i in 1:nrow(species_data)) {
+    cumulative_coverage <- cumulative_coverage + species_data$TotalCoverage[i]
+    preferred_sites <- c(preferred_sites, species_data$OralSite[i])
+    
+    if(cumulative_coverage / total_species_coverage >= 0.95) break
+  }
+  
+  preferred_sites_per_species[[species]] <- preferred_sites
+}
+
+# Create a data frame from the list, with species as one column and preferred sites as another
+preferred_sites_df <- map_df(names(preferred_sites_per_species), ~data.frame(
+  Species = .x,
+  PreferredSites = paste(preferred_sites_per_species[[.x]], collapse = ", ")
+), .id = "row") %>%
+  select(-row) # Remove the auxiliary row column added by map_df
+
+# View the resulting data frame
+print(preferred_sites_df)
+
+
+
+```
+
+###### Median coverage 
+```{r}
+library(tidyverse)
+
+# Load the data
+raw_data_wide <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Neisseriaceae_sum_Q2Q3_coverage_per_group_no_HP.txt", sep = "\t", header = TRUE)
+
+long_data <- raw_data_wide %>%
+  pivot_longer(cols = -site, names_to = "Species", values_to = "Coverage") %>%
+  rename(OralSite = site) # Renaming the site column to OralSite for clarity
+
+# Group by Species, then OralSite, and summarize to find median coverage
+species_coverage_summary <- long_data %>%
+  group_by(Species, OralSite) %>%
+  summarise(MedianCoverage = median(Coverage, na.rm = TRUE), .groups = 'drop') # Calculate median coverage
+
+# Initialize an empty list to store preferred sites for each species
+preferred_sites_per_species <- list()
+
+for(species in unique(species_coverage_summary$Species)) {
+  species_data <- filter(species_coverage_summary, Species == species)
+  # Sort sites for this species by descending median coverage
+  species_data <- species_data %>%
+    arrange(desc(MedianCoverage))
+  
+  cumulative_coverage <- 0
+  total_species_coverage <- sum(species_data$MedianCoverage)
+  preferred_sites <- c()
+  
+  for(i in 1:nrow(species_data)) {
+    cumulative_coverage <- cumulative_coverage + species_data$MedianCoverage[i]
+    
+    # Skip species with no coverage data or total coverage of zero
+    if(is.na(cumulative_coverage) || total_species_coverage == 0) next
+    
+    preferred_sites <- c(preferred_sites, species_data$OralSite[i])
+    
+    if(cumulative_coverage / total_species_coverage >= 0.95) break
+  }
+  
+  preferred_sites_per_species[[species]] <- preferred_sites
+}
+
+# Create a data frame from the list, with species as one column and preferred sites as another
+preferred_sites_df <- map_df(names(preferred_sites_per_species), ~data.frame(
+  Species = .x,
+  PreferredSites = paste(preferred_sites_per_species[[.x]], collapse = ", ")
+), .id = "row") %>%
+  select(-row) # Remove the auxiliary row column added by map_df
+
+# View the resulting data frame
+print(preferred_sites_df)
+
+
+```
+
+
+###### Mean coverage 
+```{r}
+library(tidyverse)
+
+# Load the data
+raw_data_wide <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Neisseriaceae_sum_Q2Q3_coverage_per_group_no_HP.txt", sep = "\t", header = TRUE)
+
+long_data <- raw_data_wide %>%
+  pivot_longer(cols = -site, names_to = "Species", values_to = "Coverage") %>%
+  rename(OralSite = site) # Renaming the site column to OralSite for clarity
+
+# Group by Species, then OralSite, and summarize to find mean coverage
+species_coverage_summary <- long_data %>%
+  group_by(Species, OralSite) %>%
+  summarise(MeanCoverage = mean(Coverage, na.rm = TRUE), .groups = 'drop') # Calculate mean coverage
+
+# Initialize an empty list to store preferred sites for each species
+preferred_sites_per_species <- list()
+
+for(species in unique(species_coverage_summary$Species)) {
+  species_data <- filter(species_coverage_summary, Species == species)
+  # Sort sites for this species by descending mean coverage
+  species_data <- species_data %>%
+    arrange(desc(MeanCoverage))
+  
+  cumulative_coverage <- 0
+  total_species_coverage <- sum(species_data$MeanCoverage)
+  preferred_sites <- c()
+  
+  for(i in 1:nrow(species_data)) {
+    cumulative_coverage <- cumulative_coverage + species_data$MeanCoverage[i]
+    
+    # Skip species with no coverage data or total coverage of zero
+    if(is.na(cumulative_coverage) || total_species_coverage == 0) next
+    
+    preferred_sites <- c(preferred_sites, species_data$OralSite[i])
+    
+    if(cumulative_coverage / total_species_coverage >= 0.95) break
+  }
+  
+  preferred_sites_per_species[[species]] <- preferred_sites
+}
+
+# Create a data frame from the list, with species as one column and preferred sites as another
+preferred_sites_df <- map_df(names(preferred_sites_per_species), ~data.frame(
+  Species = .x,
+  PreferredSites = paste(preferred_sites_per_species[[.x]], collapse = ", ")
+), .id = "row") %>%
+  select(-row) # Remove the auxiliary row column added by map_df
+
+# View the resulting data frame
+print(preferred_sites_df)
+
+
+```
+
+###### Weighted-means
+
+This script is designed to identify preferred oral sites for various species based on coverage data, incorporating the proportion of significant coverage samples as a weighting factor. Here's a summary of what the script does and how it achieves its objectives:
+
+Loads and Prepares Data: Reads coverage data from a specified file, which includes various species' coverage across different oral sites.
+Transforms the dataset from a wide format to a long format, where each row represents a coverage value for a species at a specific oral site.
+
+Calculates Proportions: For each species-site combination, calculates the proportion of samples that have a coverage value greater than 1. This step is crucial for understanding where each species has significant presence.
+
+Joins Proportion Data: Merges the proportion data back with the original coverage data, ensuring each row now includes the proportion of significant samples for its species-site combination.
+
+Computes Weighted Mean Coverage: Calculates the weighted mean coverage for each species at each oral site, using the previously calculated proportions as weights. This method emphasizes sites where a species is significantly present across a larger proportion of samples.
+
+In cases where the weighted mean calculation results in NaN, these are replaced with zeroes to maintain numerical stability.
+
+Greedy-Forward Selection for Preferred Sites: For each species, it orders sites by their descending weighted mean coverage to prioritize those with higher significant presence.Cumulatively adds the weighted mean coverage from the highest to the lowest until reaching or exceeding 90% of the total weighted mean coverage for that species. This process identifies a subset of sites that collectively represent the majority of the species' presence across samples.
+Accounts for potential issues like no data or total coverage of zero by including checks that skip to the next iteration in such cases.
+
+Compiles and Displays Results: Aggregates the preferred sites for each species into a list, then transforms this list into a data frame for easier viewing. Each species is listed with its preferred oral sites, concatenated into a single string separated by commas. Prints the resulting data frame, providing a clear summary of each species' preferred sites based on the analysis.
+
+In summary, this script is designed to leverage coverage data across various oral sites to pinpoint where each species predominantly exists, factoring in the proportion of significant samples to weight the coverage data. Through a greedy-forward selection method, it identifies and prioritizes oral sites that cumulatively account for the majority of a species' significant presence, aiming to offer insights into species-site preferences that could be valuable for further biological or ecological studies.
+
+
+The weighted mean is calculated using the formula:
+
+Weighted mean = sum(xi * w)/ sum(w)
+
+Where, xi represents each sample in the oral site, w represents the corresponding weight for the site (the proportion of samples with coverage greater than 1X), the sum of the products of each value and its weight is divided by the sum of all weights. The Weighted mean is calculated for each species group and each oral site. 
+
+###### Proportion Coverage 1
+
+```{r}
+
+library(tidyverse)
+
+# Load the data if not already loaded
+raw_data_wide <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Neisseriaceae_sum_Q2Q3_coverage_per_group_no_HP.txt", sep = "\t", header = TRUE)
+
+long_data <- raw_data_wide %>%
+  pivot_longer(cols = -site, names_to = "Species", values_to = "Coverage") %>%
+  rename(OralSite = site) # Renaming the site column to OralSite for clarity
+
+
+# Calculate the proportion of samples per site with Coverage > 1 for each species
+proportion_coverage_gt_1 <- long_data %>%
+  group_by(Species, OralSite) %>%
+  summarise(ProportionCoverageGT1 = mean(Coverage > 1, na.rm = TRUE), .groups = 'drop')
+
+# Join the proportion data back with the original dataset
+long_data_with_proportions <- long_data %>%
+  left_join(proportion_coverage_gt_1, by = c("Species", "OralSite"))
+
+# Step 2 and 3 together with corrections
+species_coverage_summary <- long_data_with_proportions %>%
+  group_by(Species, OralSite) %>%
+  summarise(WeightedMeanCoverage = ifelse(is.nan(weighted.mean(Coverage, w = ProportionCoverageGT1, na.rm = TRUE)),
+                                          0, weighted.mean(Coverage, w = ProportionCoverageGT1, na.rm = TRUE)),
+            .groups = 'drop')
+
+# Initialize an empty list to store preferred sites for each species
+preferred_sites_per_species <- list()
+
+for(species in unique(species_coverage_summary$Species)) {
+  species_data <- filter(species_coverage_summary, Species == species)
+  # Sort sites for this species by descending mean coverage
+  species_data <- species_data %>%
+    arrange(desc(WeightedMeanCoverage))
+  
+  cumulative_coverage <- 0
+  total_species_coverage <- sum(species_data$WeightedMeanCoverage)
+  preferred_sites <- c()
+  
+  for(i in 1:nrow(species_data)) {
+    cumulative_coverage <- cumulative_coverage + species_data$WeightedMeanCoverage[i]
+    
+    # Skip species with no coverage data or total coverage of zero
+    if(is.na(cumulative_coverage) || total_species_coverage == 0) next
+    
+    preferred_sites <- c(preferred_sites, species_data$OralSite[i])
+    
+    if(cumulative_coverage / total_species_coverage >= 0.95) break
+  }
+  
+  preferred_sites_per_species[[species]] <- preferred_sites
+}
+
+# Create a data frame from the list, with species as one column and preferred sites as another
+preferred_sites_df <- map_df(names(preferred_sites_per_species), ~data.frame(
+  Species = .x,
+  PreferredSites = paste(preferred_sites_per_species[[.x]], collapse = ", ")
+), .id = "row") %>%
+  select(-row) # Remove the auxiliary row column added by map_df
+
+write.table(preferred_sites_df, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Greedy_forward_weighted_means_analysis/ProportionCoverageGT1/WeightedMeanCoverage_results.txt", row.names = FALSE, quote = FALSE, sep = "\t")
+
+data <- as.data.frame(read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Neisseriaceae_mean_Q2Q3_coverage_per_group_no_HP.txt", header=TRUE, sep="\t", fileEncoding="UTF-8"))
+
+groups <- data$groupIDs
+
+for(focal_group in groups){
+  
+  # Extract preferred sites for the species of interest
+  preferred_sites <- preferred_sites_per_species[[focal_group]]
+  
+  # Add a new column to `species_coverage_summary` indicating if a site is preferred
+  species_coverage_summary <- species_coverage_summary %>%
+    mutate(Preferred = ifelse(OralSite %in% preferred_sites, "Preferred", "Other"))
+  
+  # Filter data for the species of interest
+  plot_data <- species_coverage_summary %>%
+    filter(Species == focal_group)
+  
+  
+  library(ggplot2)
+  
+  plot <- ggplot(plot_data, aes(x = OralSite, y = WeightedMeanCoverage, fill = Preferred)) +
+    geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+    scale_fill_manual(values = c("Preferred" = "blue", "Other" = "grey")) +
+    theme_minimal() +
+    labs(x = "Oral Site", y = "Weighted Mean Coverage", fill = "Site Status",
+         title = NULL) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  ggsave(paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Greedy_forward_weighted_means_analysis/ProportionCoverageGT1/",focal_group,"_WeightedMeanCoverage_plot.pdf"),plot,  width = 5, height = 4)
+
+}
+```
+
+###### Proportion Coverage 0.5
+```{r}
+
+
+library(tidyverse)
+
+# Load the data if not already loaded
+raw_data_wide <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Neisseriaceae_sum_Q2Q3_coverage_per_group_no_HP.txt", sep = "\t", header = TRUE)
+
+long_data <- raw_data_wide %>%
+  pivot_longer(cols = -site, names_to = "Species", values_to = "Coverage") %>%
+  rename(OralSite = site) # Renaming the site column to OralSite for clarity
+
+
+# Calculate the proportion of samples per site with Coverage > 1 for each species
+proportion_coverage_gt_0_5 <- long_data %>%
+  group_by(Species, OralSite) %>%
+  summarise(ProportionCoverageGT0_5 = mean(Coverage > 0.5, na.rm = TRUE), .groups = 'drop')
+
+# Join the proportion data back with the original dataset
+long_data_with_proportions <- long_data %>%
+  left_join(proportion_coverage_gt_0_5, by = c("Species", "OralSite"))
+
+# Step 2 and 3 together with corrections
+species_coverage_summary <- long_data_with_proportions %>%
+  group_by(Species, OralSite) %>%
+  summarise(WeightedMeanCoverage = ifelse(is.nan(weighted.mean(Coverage, w = ProportionCoverageGT0_5, na.rm = TRUE)),
+                                          0, weighted.mean(Coverage, w = ProportionCoverageGT0_5, na.rm = TRUE)),
+            .groups = 'drop')
+
+# Initialize an empty list to store preferred sites for each species
+preferred_sites_per_species <- list()
+
+for(species in unique(species_coverage_summary$Species)) {
+  species_data <- filter(species_coverage_summary, Species == species)
+  # Sort sites for this species by descending mean coverage
+  species_data <- species_data %>%
+    arrange(desc(WeightedMeanCoverage))
+  
+  cumulative_coverage <- 0
+  total_species_coverage <- sum(species_data$WeightedMeanCoverage)
+  preferred_sites <- c()
+  
+  for(i in 1:nrow(species_data)) {
+    cumulative_coverage <- cumulative_coverage + species_data$WeightedMeanCoverage[i]
+    
+    # Skip species with no coverage data or total coverage of zero
+    if(is.na(cumulative_coverage) || total_species_coverage == 0) next
+    
+    preferred_sites <- c(preferred_sites, species_data$OralSite[i])
+    
+    if(cumulative_coverage / total_species_coverage >= 0.95) break
+  }
+  
+  preferred_sites_per_species[[species]] <- preferred_sites
+}
+
+# Create a data frame from the list, with species as one column and preferred sites as another
+preferred_sites_df <- map_df(names(preferred_sites_per_species), ~data.frame(
+  Species = .x,
+  PreferredSites = paste(preferred_sites_per_species[[.x]], collapse = ", ")
+), .id = "row") %>%
+  select(-row) # Remove the auxiliary row column added by map_df
+
+write.table(preferred_sites_df, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Greedy_forward_weighted_means_analysis/ProportionCoverageGT0_5/WeightedMeanCoverage_results.txt", row.names = FALSE, quote = FALSE, sep = "\t")
+
+data <- as.data.frame(read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Neisseriaceae_mean_Q2Q3_coverage_per_group_no_HP.txt", header=TRUE, sep="\t", fileEncoding="UTF-8"))
+
+groups <- data$groupIDs
+
+for(focal_group in groups){
+  
+  # Extract preferred sites for the species of interest
+  preferred_sites <- preferred_sites_per_species[[focal_group]]
+  
+  # Add a new column to `species_coverage_summary` indicating if a site is preferred
+  species_coverage_summary <- species_coverage_summary %>%
+    mutate(Preferred = ifelse(OralSite %in% preferred_sites, "Preferred", "Other"))
+  
+  # Filter data for the species of interest
+  plot_data <- species_coverage_summary %>%
+    filter(Species == focal_group)
+  
+  
+  library(ggplot2)
+  
+  plot <- ggplot(plot_data, aes(x = OralSite, y = WeightedMeanCoverage, fill = Preferred)) +
+    geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+    scale_fill_manual(values = c("Preferred" = "blue", "Other" = "grey")) +
+    theme_minimal() +
+    labs(x = "Oral Site", y = "Weighted Mean Coverage", fill = "Site Status",
+         title = NULL) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  ggsave(paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Greedy_forward_weighted_means_analysis/ProportionCoverageGT0_5/",focal_group,"_WeightedMeanCoverage_plot.pdf"),plot,  width = 5, height = 4)
+
+}
+
+
+```
+
+###### Final Greedy-forward script
+
+Loop through range of proportional weights and generate one final table that has all species in one column and preferred sites for each weight in the remaining columns. And maybe also their respective weights. 
+
+Summary of what the script below does, step by step, for clarity and future reference:
+
+Load Necessary Libraries: The script begins by loading the tidyverse library, which is a collection of R packages designed for data science, providing tools for data manipulation (dplyr), data visualization (ggplot2), and more.
+
+Prepare Data: Assumes long_data is prepared outside the loop. This dataset is structured so that each row represents a sample with its corresponding species, oral site, and coverage.
+
+Loop Over Proportions: Iterates through a sequence of proportion values (from 0 to 4, with a step of 0.5). For each proportion, it calculates the proportion of samples per site where the coverage is greater than that proportion threshold for each species.
+
+Calculate Proportion Coverage:For each species-site combination, calculates the proportion of samples with coverage greater than the current proportion threshold, creating a measure of how often coverage exceeds that threshold across samples.
+
+Join Proportion Data: Merges the calculated proportion coverage back with the original dataset, ensuring each row now includes this proportion measure.
+
+Calculate Weighted Mean Coverage: Computes the weighted mean coverage for each species at each site using the proportion of samples exceeding the threshold as weights. This approach emphasizes sites where a species frequently has significant coverage.
+
+Determine Preferred Sites: For each species, identifies preferred sites based on the greedy-forward method, considering sites in descending order of weighted mean coverage until reaching or exceeding 95% of the total weighted mean coverage for that species.
+
+Compile Results for Each Proportion: Converts the list of preferred sites per species into a dataframe and stores it in all_proportions_results, keyed by the proportion value used in the calculations.
+
+Create a Final Table: Binds all proportion-specific dataframes into a single dataframe and then reshapes it to have one column for each proportion value, with rows representing species and their preferred sites as determined under each proportion threshold.
+
+Display or Save the Final Table: The final table is printed for review, showing for each species the preferred sites identified under each proportion threshold used in the analysis.
+
+This script effectively leverages a dynamic approach to explore how varying the threshold for considering significant coverage affects the identification of preferred sites for different species. It provides a comprehensive view across a range of criteria, offering insights into species-site relationships and how these might shift with different definitions of significant presence.
+
+```{bash}
+
+cd /Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Greedy_forward_weighted_means_analysis
+
+Rscript Greedy_forward_selection_method.R
+
+```
+
+
+##### Linear model with AIC
+
+```{bash}
+
+cd /Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/LM_AIC
+
+Rscript Multi_site_classification_Q2Q3_coverage_linear_model_with_AIC.R
+
+```
+
+
+
+##### Linear model with MLE
+
+```{bash}
+
+cd /Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/LM_MLE
+
+Rscript Multi_site_classification_Q2Q3_coverage_linear_model_with_MLE.R
+
+```
+
+
+###### LM with weighted means
+
+First create data sets with weighted means
+```{r}
+
+# Define the base path where the species_coverage_summary files are stored
+base_path <- "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/LM_MLE/"
+
+# Load data
+df <- as.data.frame(read.csv(paste0(base_path,"Neisseriaceae_sum_Q2Q3_coverage_per_group_no_HP.txt"), header=TRUE, sep="\t", fileEncoding="UTF-8"))
+
+# Convert data to long form
+df_long <- pivot_longer(df, cols = -site, names_to = "groupIDs", values_to = "value")
+df_long$site <- as.factor(df_long$site)
+df_long$groupIDs <- as.factor(df_long$groupIDs)
+
+# Loop for calculating preferred sites with NA and zero checks
+for(Proportion in seq(from = 0, to = 4, by = 0.5)) {
+  # Assuming long_data is already prepared outside the loop for efficiency
+  # Calculate the proportion of samples per site with Coverage > Proportion for each species
+  proportion_coverage <- df_long %>%
+    group_by(groupIDs, site) %>%
+    summarise(ProportionCoverage = mean(value >= Proportion, na.rm = TRUE), .groups = 'drop')
+  
+  # Join the proportion data back with the original dataset
+  long_data_with_proportions <- df_long %>%
+    left_join(proportion_coverage, by = c("groupIDs", "site")) %>% 
+    mutate(WeightedMeanCoverage = value * ProportionCoverage) %>% 
+    rename(RawMeanCoverage = value) %>% 
+    dplyr::select(groupIDs, site, WeightedMeanCoverage, RawMeanCoverage)
+  
+  # # Calculate weighted coverages
+  # species_weighted_mean_coverage <- long_data_with_proportions %>%
+  #   group_by(groupIDs, site) %>%
+  #   summarise(WeightedMeanCoverage = mean(value * ProportionCoverage),
+  #             RawMeanCoverage = mean(value))
+  
+  
+ # Save weighted means
+  write.table(long_data_with_proportions, paste0(base_path,"Weighted_means/Weight_",Proportion,"/Neisseriaceae_WEIGHTED_sum_Q2Q3_coverage_per_group_no_HP.txt"), row.names = FALSE, quote = FALSE, sep = "\t")
+  
+}
+
+
+
+
+```
+
+
+```{bash}
+
+cd /Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/LM_MLE/Weighted_means
+
+Rscript Neisseriaceae_mean_Q2Q3_coverage_per_group_no_HP.R
+
+```
+
+
+##### Binomial detection model
+
+###### 50% breadth threshold
+```{bash}
+
+#Based on df =Neisseriaceae_accum_detection_per_group_no_HP.txt
+
+cd /Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/GLM_Detection
+
+Rscript Multi_site_classification_detection_probability_MLE.R
+
+```
+
+###### 25% breadth threshold
+```{bash}
+
+cd /Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/GLM_25_percent_Detection
+
+Rscript Multi_site_classification_25_percent_detection_probability_MLE.R
+```
+
+###### Multiple detection thresholds
+
+```{bash}
+
+#####  Create directories ##### 
+cd /Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/GLM_Detection/
+
+mkdir Thresholds
+
+cd Thresholds
+
+mkdir Threshold_0_1 Threshold_0_2 Threshold_0_3 Threshold_0_4 Threshold_0_5 Threshold_0_6 Threshold_0_7 Threshold_0_1/Plots Threshold_0_2/Plots Threshold_0_3/Plots Threshold_0_4/Plots Threshold_0_5/Plots Threshold_0_6/Plots Threshold_0_7/Plots Threshold_0_1/Intermediary_files Threshold_0_2/Intermediary_files Threshold_0_3/Intermediary_files Threshold_0_4/Intermediary_files Threshold_0_5/Intermediary_files Threshold_0_6/Intermediary_files Threshold_0_7/Intermediary_files
+
+```
+
+Create detection data frames based on varying levels of breadth thresholds
+```{r}
+
+
+# Load group data
+Final_Groups <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Neisseriaceae_genome_groups.txt", header = TRUE, sep = "\t")
+
+# Load raw strain level breadth data
+raw_df <- read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Strain_level_updated_detection_data.csv", header = TRUE)
+
+
+for(threshold in seq(from = 1, to = 7, by = 1)){
+
+  # Set threshold variable for mutate function
+  THRESHOLD <- as.numeric(noquote(paste0("0.",threshold)))
+  
+  # Set base path to directory for each threshold
+  base_path <- paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/GLM_Detection/Thresholds/Threshold_0_",threshold,"/")
+ 
+  # Create binary detection variable based on threshold and select required columns
+  raw_df$value <- round(raw_df$value, digits = 4)
+  
+  df_select <- raw_df %>% 
+    dplyr::select(layers, bins, value) %>% 
+    mutate(detection_binary = ifelse(value >= THRESHOLD, 1, 0)) %>% 
+    dplyr::select(layers, bins, detection_binary)
+  
+  # Merge with species groups info
+  df_select_with_groups <- merge(df_select, Final_Groups, by.x = "bins", by.y = "Pangenome_ID")
+  
+  # Sum detection at the species level and mutate detection so that values >=1 become binary
+  sum_detection_df_per_group <- df_select_with_groups %>%
+    group_by(layers, Group_ID) %>%
+    summarise(sum_detection = sum(detection_binary)) %>% 
+    mutate(accumulated_detection = ifelse(sum_detection >= 1, 1, 0))
+  
+  
+  # Add site column
+  sum_detection_df_per_group <- sum_detection_df_per_group %>% 
+    mutate(site = case_when(grepl('TD_', layers) ~ 'TD', 
+                            grepl('KG_', layers) ~ 'KG', 
+                            grepl('PP_', layers) ~ 'SUPP',
+                            grepl('PB_', layers) ~ 'SUBP',
+                            grepl('SA_', layers) ~ 'SV',
+                            grepl('TH_', layers) ~ 'TH',
+                            grepl('PT_', layers) ~ 'PT',
+                            grepl('HP_', layers) ~ 'HP',
+                            grepl('BM_', layers) ~ 'BM'))
+  
+  # pivot wider 
+  sum_detection_df_per_group_wide <- sum_detection_df_per_group %>%  
+    dplyr::select(site, Group_ID, accumulated_detection) %>% 
+    droplevels() %>% 
+    pivot_wider(names_from = Group_ID, values_from = accumulated_detection) 
+  
+  # Drop layers column
+  sum_detection_df_per_group_wide <- sum_detection_df_per_group_wide[,-1]
+  
+  # Drop all rows that contain "HP" in "site: column
+  sum_detection_df_per_group_wide_no_HP <- sum_detection_df_per_group_wide %>% 
+    filter(site != "HP")
+  
+  # Save df
+  write.table(sum_detection_df_per_group_wide_no_HP, paste0(base_path,"Neisseriaceae_Threshold_0_",threshold,"_accum_detection_per_group_no_HP.txt"), quote = FALSE, row.names = FALSE, sep = "\t")
+
+  
+}
+
+
+```
+
+
+###### Run script
+
+```{bash}
+cd /Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/GLM_Detection/
+
+Rscript TEST_Multi_site_classification_detection_probability_multiple_thresholds.R
+
+```
+
+
+
+###### Prevalence tables: Species level
+
+```{r}
+library(dplyr)
+library(readr)
+library(tidyr)
+
+# Load group data
+Final_Groups <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Neisseriaceae_genome_groups.txt", header = TRUE, sep = "\t")
+
+# Load raw strain level breadth data
+raw_df <- read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Strain_level_updated_detection_data.csv", header = TRUE)
+
+# Define the output base path where you want to save the final tables
+output_base_path <- "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/GLM_Detection/Thresholds/"
+
+# Make sure the directory exists, if not create it
+if(!dir.exists(output_base_path)) {
+  dir.create(output_base_path, recursive = TRUE)
+}
+
+results_list <- list() # Initialize an empty list to store results for each species
+
+
+for(species in unique(Final_Groups$Group_ID)){ 
+  # Initialize an empty data frame for this species with just the site column
+  species_table <- data.frame(site = character())
+  
+  for(threshold in seq(from = 1, to = 7, by = 1)){
+    THRESHOLD <- as.numeric(noquote(paste0("0.",threshold)))
+    
+   
+    # Create binary detection variable based on threshold and select required columns
+    raw_df$value <- round(raw_df$value, digits = 4)
+    
+    df_select <- raw_df %>% 
+      dplyr::select(layers, bins, value) %>% 
+      mutate(detection_binary = ifelse(value >= THRESHOLD, 1, 0)) %>% 
+      dplyr::select(layers, bins, detection_binary)
+    
+    # Merge with species groups info
+    df_select_with_groups <- merge(df_select, Final_Groups, by.x = "bins", by.y = "Pangenome_ID")
+    
+    # Sum detection at the species level and mutate detection so that values >=1 become binary
+    sum_detection_df_per_group <- df_select_with_groups %>%
+      group_by(layers, Group_ID) %>%
+      summarise(sum_detection = sum(detection_binary)) %>% 
+      mutate(accumulated_detection = ifelse(sum_detection >= 1, 1, 0))
+    
+    
+    # Add site column
+    sum_detection_df_per_group <- sum_detection_df_per_group %>% 
+      mutate(site = case_when(grepl('TD_', layers) ~ 'TD', 
+                              grepl('KG_', layers) ~ 'KG', 
+                              grepl('PP_', layers) ~ 'SUPP',
+                              grepl('PB_', layers) ~ 'SUBP',
+                              grepl('SA_', layers) ~ 'SV',
+                              grepl('TH_', layers) ~ 'TH',
+                              grepl('PT_', layers) ~ 'PT',
+                              grepl('HP_', layers) ~ 'HP',
+                              grepl('BM_', layers) ~ 'BM'))
+    
+    
+    # Calculate Prevalence as you've done, but directly within the summarise
+    prevalence_table <- sum_detection_df_per_group %>% 
+      filter(Group_ID == species) %>% 
+      group_by(site) %>% 
+      summarise(Prevalence = round(sum(accumulated_detection)/n(), digits = 4)*100) %>%
+      rename(!!paste0("Prevalence_", THRESHOLD) := Prevalence)
+    
+    # Merge or join this threshold's prevalence with the accumulating species_table
+    # This ensures that each threshold's prevalence becomes a new column
+    if(nrow(species_table) == 0){
+      species_table <- prevalence_table
+    } else {
+      species_table <- left_join(species_table, prevalence_table, by = "site")
+    }
+  }
+  
+  # Store the completed table for this species in the list
+  results_list[[species]] <- species_table
+  
+  # Define the file path using the species name
+  file_path <- paste0(output_base_path, species, "_prevalence_table.csv")
+  
+  # Save the table to CSV
+  write.csv(species_table, file_path, row.names = FALSE)
+}
+
+
+    
+```
+
+###### Boostrap method
+
+For a more robust statistical test, we could bootstrap the difference in log-likelihood values:
+
+Bootstrap: Re-sample the data with replacement, fit models to each bootstrap sample, and calculate the difference in the chosen metric (log-likelihood) for each sample. This will give you a distribution of the difference from which you can assess the variability and confidence intervals around the mean difference.
+
+Analyzing Bootstrap Results:
+
+Distribution of MLE Differences:
+
+Examine the histogram and the statistical summaries of the MLE differences you obtained from the bootstrap simulations. The key indicators to look for are:
+
+Mean of MLE Differences: If the mean MLE difference is significantly different from zero, it suggests a consistent difference in model performance across the bootstrap samples. A positive mean indicates that model(i) consistently has a higher MLE (worse performance), and a negative mean suggests that model(ij) is generally worse.
+
+Confidence Intervals: Check the 95% confidence intervals for the MLE differences. If zero is not within this interval, it suggests that the difference in model performance is statistically significant at the 95% confidence level.
+
+Decision Based on Bootstrap Results:
+
+Statistical Significance: If the confidence interval of the MLE differences excludes zero, you have statistical evidence that one model is consistently better than the other across the resampled datasets.
+
+Practical Significance: Consider the magnitude of the difference. Even if statistically significant, small differences might not be practically important depending on the context of your analysis and the sensitivity of your application to model performance.
+
+Applying the Results:
+
+Choose the Model: Based on the above analyses, choose the model which shows lower MLE more consistently and whose confidence interval suggests a significant improvement over the other.
+
+Consider Other Metrics: If the MLE differences are minimal or inconclusive, consider looking at other aspects such as:
+Coefficient significance: Are the coefficients in one model more statistically significant than in the other?
+
+Predictive performance: If applicable, assess how each model performs on a held-out validation set or through cross-validation methods. Metrics like accuracy, ROC AUC, precision, recall, etc., might be relevant depending on your specific goals.
+
+Interpretability and simplicity: Sometimes, a slightly less statistically efficient model may be preferred if it is easier to interpret or aligns better with business or operational constraints.
+
+Example of Making a Decision
+
+If your bootstrap results show that model2 has a consistently lower MLE with a mean difference of -5 and the 95% confidence interval from -7 to -3, then you can conclude that model2 is statistically significantly better than model1. If the differences are marginal and include zero in the confidence interval, then further examination of practical implications and other model performance metrics might be necessary to make a final decision.
+
+Conclusion
+
+By combining statistical analysis (bootstrap results) with practical considerations (impact of model differences, ease of use, etc.), you can make a well-rounded decision on which model best suits your needs. This approach ensures that your model choice is not only backed by statistical evidence but also aligned with practical requirements and constraints.
+
+
+
+```{bash, eval = FALSE}
+
+cd /Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/GLM_Detection/Thresholds/Threshold_0_5
+
+Rscript Bootstrap_method.R
+
+```
+
+### Figures
+
+```{r, eval=FALSE}
+
+
+# Set working directory
+setwd("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP")
+
+# Load data and convert percents to long form
+Q2Q3_coverage <- as.data.frame(read.csv("Neisseriaceae_sum_Q2Q3_coverage_per_group_no_HP.txt", header=TRUE, sep="\t", fileEncoding="UTF-8"))
+df_long_Q2Q3_coverage <- pivot_longer(Q2Q3_coverage, cols = -site, names_to = "groupIDs", values_to = "value")
+df_long_Q2Q3_coverage$site <- as.factor(df_long_Q2Q3_coverage$site)
+df_long_Q2Q3_coverage$groupIDs <- as.factor(df_long_Q2Q3_coverage$groupIDs)
+
+Detection <- read.table("GLM_Detection/Thresholds/Threshold_0_5/Neisseriaceae_Threshold_0_5_accum_detection_per_group_no_HP.txt", header = TRUE, sep = "\t")
+df_long_Detection <- pivot_longer(df, cols = -site, names_to = "groupIDs", values_to = "value")
+df_long_Detection$site <- as.factor(df_long_Detection$site)
+df_long_Detection$groupIDs <- as.factor(df_long_Detection$groupIDs)
+
+final_results_Q2Q3_coverage <- read.table("T_TEST/Neisseriaceae_analysis-of-differential-Q2Q3coverage.txt", sep = "\t", header = TRUE)
+final_results_Detection <- read.table("GLM_Detection/Thresholds/Threshold_0_5/Final_results.txt", sep = "\t", header = TRUE)
+
+# Get a list of unique Group IDs
+unique_groups <- unique(df_long_Q2Q3_coverage$groupIDs)
+
+for(GROUP in unique_groups) {
+  
+  # Raw mean probability of detection per site
+  species_Q2Q3_coverage_summary <- df_long_Q2Q3_coverage %>% 
+    dplyr::filter(groupIDs == GROUP) %>% 
+    group_by(site) %>% 
+    summarise(MeanQ2Q3Coverage = mean(value),
+              N = n(),
+              STD = sd(value),
+              SE = STD/sqrt(N))
+  
+  # filter site_preferences data frame by focal group 
+  site_Q2Q3_coverage_preferences <- final_results_Q2Q3_coverage %>% 
+    dplyr::filter(groupIDs == GROUP) %>% 
+    dplyr::select(groupIDs, ABUNDANT_IN) 
+  
+  # Split the string into individual sites
+  preferred_sites_Q2Q3_coverage_preferences <- unlist(strsplit(site_Q2Q3_coverage_preferences$ABUNDANT_IN, ","))
+  
+  species_Q2Q3_coverage_summary <- species_Q2Q3_coverage_summary %>%
+    dplyr::mutate(Preferred = ifelse(site %in% preferred_sites_Q2Q3_coverage_preferences, "Preferred", "Other")) 
+  
+  # Plotting
+  ABUNDANCE_Plot <- ggplot(species_Q2Q3_coverage_summary, aes(x = site, y = MeanQ2Q3Coverage, fill = Preferred)) +
+    geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+    geom_errorbar(aes(ymin = MeanQ2Q3Coverage - SE, ymax = MeanQ2Q3Coverage +SE), position = position_dodge(), width = 0.5) +
+    scale_fill_manual(values = c("Preferred" = "blue", "Other" = "grey")) +
+    theme_minimal() +
+    labs(x = "Oral Site", y = "Abundance", fill = "Site Status") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "none")
+  
+  
+  # Raw mean probability of detection per site
+  species_detection_summary <- df_long_Detection %>% 
+    dplyr::filter(groupIDs == GROUP) %>% 
+    group_by(site) %>% 
+    summarise(MeanDetection = mean(value),
+              N = n(),
+              STD = sd(value),
+              SE = sqrt(MeanDetection * (1 - MeanDetection) / N))
+  
+  
+  # filter site_preferences data frame by focal group 
+  site_preferences_detection <- final_results_Detection %>% 
+    dplyr::filter(Group_ID == GROUP) %>% 
+    dplyr::select(Group_ID, Best_Map) 
+  
+  # Split the string into individual sites
+  preferred_sites_detection <- unlist(strsplit(site_preferences_detection$Best_Map, ", "))
+  
+  species_detection_summary <- species_detection_summary %>%
+    dplyr::mutate(Preferred = ifelse(site %in% preferred_sites_detection, "Preferred", "Other")) 
+  
+  # Plotting
+  PREVALENCE_Plot <- ggplot(species_detection_summary, aes(x = site, y = MeanDetection, fill = Preferred)) +
+    geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+    geom_errorbar(aes(ymin = MeanDetection - SE, ymax = MeanDetection +SE), position = position_dodge(), width = 0.5) +
+    scale_fill_manual(values = c("Preferred" = "blue", "Other" = "grey")) +
+    theme_minimal() +
+    labs(x = "Oral Site", y = "Prevalence", fill = "Site Status") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  # Save the plot
+  plot <- grid.arrange(ABUNDANCE_Plot, PREVALENCE_Plot, ncol=2,
+                       widths = c(1,1.35))
+  
+  # Save the plot
+  ggsave(paste0("FIGURES/", GROUP,"_COMBO_plot.pdf"), plot, width = 8, height = 4)
+  
+}
+
+
+
+
+
+```
+
+### Supplemental data file
+
+The purpose of this section is to produce a merged table of site preferences per each genome and species that can be added to the master supplemental data file. 
+
+```{r, eval=FALSE}
+
+# Load species/genome grouping file.
+df1 <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Neisseriaceae_genome_groups.txt", header = TRUE, sep = "\t")
+
+# Load final_results_for_merging file.
+df2 <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Final_results_for_merging.txt", header = TRUE, sep = "\t")
+
+# Merge by species ID.
+df3 <- merge(df1, df2, by.x = "Group_ID", by.y = "SPECIES", all.x = TRUE) 
+
+# Save the merged file.
+write.table(df3, "/Users/home/SPECIES_LEVEL_PANGENOMES/TESTS/Classifying_genomes_to_oral_sites/Groups/Without_HP/Final_results_strain_level.txt", row.names = FALSE, quote = FALSE, sep = "\t")
+
+```

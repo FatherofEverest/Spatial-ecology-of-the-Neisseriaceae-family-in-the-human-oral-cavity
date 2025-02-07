@@ -1,0 +1,1249 @@
+---
+title: "Untitled"
+author: "J. J. Giacomini"
+date: "2024-05-06"
+output: html_document
+---
+
+
+The purpose of this code is to generate gene-level detection radial plots for focal genomes using a subset of metagenomes (top 30 ranked by median coverage) for three oral sites where site-specialization was observed (SUPP, TD and KG). We will need files that were made in the main analysis file, including:
+
+
+1. G_0213_Neisseriaceae-PAN.db
+2. G_0213_Neisseriaceae-GENOMES.db
+3. GENOME-gene_detection.txt-COMBO-30 (where GENOME is something like A_sp_HMT_458_str_W10330_id_GCA_000466335_1)
+
+The GENOME-gene_detection.txt-COMBO-30 file was made below using the indivMetaCombiner_DETECTION.py script.
+
+# SUPP, TD, KG
+
+Gene-level detection radial plots for top 30 metagenomes ranked by median coverage for three oral sites where species demonstrated site-specialization (SUPP, TD, KG)
+
+First create Gene_level_bin_list.txt using nano. File needs a list of pamngenome ids to focus on.
+
+```{bash, eval=FALSE}
+
+WD=/workspace/jmarkwelchlab/P_0003_Neisseriaceae
+DIR_SummaryPROF=$WD/08_PROFILE_SUMMARY
+GENE_LEVEL_DETECTION=$WD/23_GENE_LEVEL_DETECTION
+projectID=P_0003_Neisseriaceae
+
+mkdir $GENE_LEVEL_DETECTION
+
+# copy required files to a new directory named 23_GENE_LEVEL_DETECTION
+for bin in `cat $GENE_LEVEL_DETECTION/Gene_level_bin_list.txt`
+  do
+  for site in TD PP KG
+    do
+      mkdir $GENE_LEVEL_DETECTION/${site}
+      cp $DIR_SummaryPROF/${projectID}_${site}-profile/bin_by_bin/$bin/${bin}-gene_detection.txt $GENE_LEVEL_DETECTION/${site}/${bin}-gene_detection.txt
+  done
+done
+```
+
+Make the GENOME-gene_detection.txt-COMBO-30 files...
+
+```{bash, eval=FALSE}
+# concatenate, sort and filter each file 
+clusterize -n 2 -l LOGS/indivMetaCombiner_DET_A.log ./SCRIPTS/indivMetaCombiner_DETECTION.py  N_cinerea_str_CCUG_346_id_GCA_963394925_1 30
+
+clusterize -n 2 -l LOGS/indivMetaCombiner_DET_B.log ./SCRIPTS/indivMetaCombiner_DETECTION.py  K_oralis_str_ATCC_51147_id_GCA_000160435_1 30
+
+clusterize -n 2 -l LOGS/indivMetaCombiner_DET_C.log ./SCRIPTS/indivMetaCombiner_DETECTION.py  N_perflava_str_CCUG_17915_id_GCA_023472875_1 30
+
+##
+
+```
+
+
+Send detection files to my local machine
+```{bash, eval = FALSE}
+
+scp -r jgiacomini@evol5.mbl.edu:/workspace/jmarkwelchlab/P_0003_Neisseriaceae/23_GENE_LEVEL_DETECTION /Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/
+
+```
+
+Summarise gene coverages for gene-caller_ids and gene clusters for each genome. This will produce a single txt file
+```{bash}
+PAN_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/G_0213
+GENOMES=P_0003_Neisseriaceae-GENOMES.db
+PAN=P_0003_Neisseriaceae-RESULTS/P_0003_Neisseriaceae-PAN.db
+
+# migrate to version 15
+#anvi-migrate $PAN_DIR/$PAN --migrate-dbs-safely
+
+# summary of gene coverage for gene-caller_ids and gene clusters for each genome
+anvi-summarize -g $PAN_DIR/$GENOMES -p $PAN_DIR/$PAN --init-gene-coverages  -o $PAN_DIR/SUMMARY -C default 
+
+```
+
+Subset the pangenome summary file. We don't need things like aa sequences
+```{bash}
+cut -f 1-5 $PAN_DIR/SUMMARY/P_0003_Neisseriaceae_gene_clusters_summary.txt > $PAN_DIR/SUMMARY/P_0003_Neisseriaceae_gene_clusters_summary_subset.txt
+```
+
+
+In order to find the gene clusters that are core and accessory for each species, we need a file that contains a list of the genomes in each species group. For H. parainfluenzae and for A. sp. HMT-458. Need GenomeID column header.
+
+```{r, eval = FALSE}
+
+K_oralis <- data.frame(Genome_ID  = c("K_oralis_str_ATCC_51147_id_GCA_000160435_1",
+                     "K_bonacorsii_str_Marseille_Q4569_id_GCA_016623605_1"))
+write.table(K_oralis, "/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/K_oralis_collection_list.txt", row.names = FALSE, quote = FALSE)
+
+
+N_cinerea <- data.frame(Genome_ID  = c("N_cinerea_str_C2012028592_id_GCA_003044675_1",
+                                       "N_cinerea_str_C2013024221_id_GCA_003044745_1",
+                                       "N_cinerea_str_C2014013859_id_GCA_003044825_1",
+                                       "N_cinerea_str_C2014019557_id_GCA_003044855_1",
+                                       "N_cinerea_str_CCUG_2156_id_GCA_021025975_1",
+                                       "N_cinerea_str_CCUG_25879_id_GCA_963394945_1",
+                                       "N_cinerea_str_CCUG_28662_id_GCA_963395045_1",
+                                       "N_cinerea_str_CCUG_346_id_GCA_963394925_1",
+                                       "N_cinerea_str_CCUG_5746_id_GCA_963394885_1",
+                                       "N_cinerea_str_NCTC10294_id_GCA_900475315_1"))
+write.table(N_cinerea, "/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/N_cinerea_collection_list.txt", row.names = FALSE, quote = FALSE)
+
+N_subflava <- data.frame(Genome_ID  = c("N_sp_str_HMSC072C05_id_GCA_001809585_1",
+                                           "N_sp_str_HMSC073G10_id_GCA_001812605_1",
+                                           "N_sp_str_HMSC075C10_id_GCA_001815615_1",
+                                           "N_subflava_str_C2011033015_id_GCA_003044665_1",
+                                           "N_subflava_str_UMB1050_id_GCA_030218065_1",
+                                           "N_sicca_str_ATCC_29256_id_GCA_019334765_1",
+                                           "N_subflava_str_C2007002879_id_GCA_003044385_1",
+                                           "N_subflava_str_C2008002238_id_GCA_003044845_1",
+                                           "N_subflava_str_C2011020199_id_GCA_003044965_1",
+                                           "N_subflava_str_C2014021188_id_GCA_003045025_1",
+                                           "N_flavescens_str_CD_NF1_id_GCA_001618015_1",
+                                           "N_sp_str_HMSC068C04_id_GCA_001810105_1",
+                                           "N_sp_str_KH1003_01_id_GCA_014596365_2",
+                                           "N_subflava_str_HP0015_id_GCA_024205745_1",
+                                           "N_subflava_str_HP0069_id_GCA_024205785_1",
+                                           "N_subflava_str_TT0073_id_GCA_024205725_1",
+                                           "N_flavescens_str_CD_NF2_id_GCA_001618065_1",
+                                           "N_flavescens_str_CD_NF3_id_GCA_001618075_1",
+                                           "N_flavescens_str_CNF_id_GCA_001618085_1",
+                                           "N_flavescens_str_N57_id_GCA_900654185_1",
+                                           "N_perflava_str_CCUG_17915_id_GCA_023472875_1",
+                                           "N_perflava_str_UMB0210_id_GCA_002847985_1",
+                                           "N_sp_str_HMSC064D07_id_GCA_001837185_1",
+                                           "N_sp_str_HMSC065C04_id_GCA_001815375_1",
+                                           "N_sp_str_HMSC066F04_id_GCA_001837365_1",
+                                           "N_sp_str_Marseille_Q5346_id_GCA_946902045_1",
+                                           "N_subflava_str_C2011009653_id_GCA_003044645_1",
+                                           "N_subflava_str_C2012011976_id_GCA_003044935_1",
+                                           "N_subflava_str_CCUG_24918_id_GCA_963396215_1",
+                                           "N_subflava_str_TT0077_id_GCA_024205705_1",
+                                           "N_subflava_str_CCUG_800_id_GCA_963396265_1",
+                                           "N_flavescens_str_N78_id_GCA_900654195_1",
+                                           "N_sp_str_HMSC056A03_id_GCA_001815685_1",
+                                           "N_sp_str_HMSC069H12_id_GCA_001812735_1",
+                                           "N_subflava_str_ATCC_49275_id_GCA_005221305_1",
+                                           "N_subflava_str_CCUG_25198_id_GCA_963396245_1",
+                                           "N_subflava_str_CCUG_29761_id_GCA_963395055_1",
+                                           "N_subflava_str_CCUG_4788_id_GCA_963395005_1",
+                                           "N_subflava_str_HP0001_id_GCA_023635105_1",
+                                           "N_subflava_str_TT0074_id_GCA_023635065_1",
+                                           "N_flavescens_str_ATCC_13120_id_GCA_005221285_1",
+                                           "N_lactamica_str_338_rep1_NLAC_id_GCA_001064605_1",
+                                           "N_mucosa_str_C6A_id_GCA_000763635_1",
+                                           "N_mucosa_str_FDAARGOS_758_id_GCA_013267835_1",
+                                           "N_sp_str_DTU_2021_id_GCA_032342915_1",
+                                           "N_sp_str_HMSC066H01_id_GCA_001837375_1",
+                                           "N_sp_str_HMSC078C12_id_GCA_001838065_1",
+                                           "N_sp_str_RH3002v2g_id_GCA_014596425_2",
+                                           "N_subflava_str_BgEED23_id_GCA_901875325_1",
+                                           "N_subflava_str_C2008001664_id_GCA_003044505_1",
+                                           "N_subflava_str_HP0048_id_GCA_024205685_1",
+                                           "N_subflava_str_KH1003_02_id_GCA_014596395_2",
+                                           "N_subflava_str_MA3_1_id_GCA_019815145_1",
+                                           "N_sp_str_HMSC061H08_id_GCA_001836795_1"))
+write.table(N_subflava, "/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/N_subflava_collection_list.txt", row.names = FALSE, quote = FALSE)
+
+
+
+```
+
+```{r create functions}
+
+library(janitor)
+library(dplyr)
+
+species_group_gene_cluster_binning <- function(group) {
+  # load data
+  pan_summary_df <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/G_0213/SUMMARY/P_0003_Neisseriaceae_gene_clusters_summary_subset.txt", header = TRUE, sep = "\t", fill = TRUE)
+  pan_summary_df$genome_name <- as.factor(pan_summary_df$genome_name)
+  group_df = read.table(paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/",group,"_collection_list.txt"), header = TRUE, sep = "\t")
+  
+  # count number of rows in group collection list
+  n_group = nrow(group_df)
+  
+  # filter data by genome group
+  df1 <- pan_summary_df %>% 
+    filter(genome_name %in% group_df$Genome_ID) %>% 
+    droplevels()
+  df1$gene_callers_id <- as.factor(df1$gene_callers_id)
+  df1$gene_cluster_id <- as.factor(df1$gene_cluster_id)
+  
+  # Create wide df that tallys the count of gene-cluster_ID for each genome
+  df2 <- df1 %>%
+    # count number of rows for each combination of genome_name and gene_cluster_id
+    group_by(genome_name, gene_cluster_id) %>%
+    tally() %>%
+    # pivot the protocol names over the columns
+    pivot_wider(names_from=gene_cluster_id, values_from=n) %>%
+    # replace NA values in all columns with 0
+    mutate(across(everything(), .fns=~replace_na(., 0)))
+  
+  # remove first column
+  df4<-df2[,-1]
+  
+  # convert matrix to binary
+  df5 <- as.matrix((df4>0)+0)
+  
+  # convert matrix to data frame
+  df5 <- as.data.frame(df5)
+  
+  # add back first column
+  df5 <- cbind(df2$genome_name, df5)
+  
+  df6 <-df5 %>% 
+    rename(genome_name = 'df2$genome_name')
+  
+  # Add new row that is the sum of each column 
+  df7 <- df6 %>%
+    adorn_totals("row")
+  
+  # drop column 1
+  df8 <- df7 %>%
+    select(-c(genome_name))
+  
+  #drop rows (only keep last row  that contains sum total for each col)
+  df9 <- df8[-c(1:n_group), ]
+  
+  #transpose
+  df10 <- df9 %>% 
+    melt() %>% 
+    rename(gene_cluster_id = variable, sum = value)
+  
+  # add col for bin
+  df11 <- df10 %>% 
+    mutate(Bin = case_when(sum == n_group ~ paste0(group,"_Core"),
+                           sum > 1 & sum < n_group ~ paste0(group,"_Acc"),
+                           sum == 1 ~ paste0(group,"_Single")))
+  
+  # merge with group_pan_summary_df (df1) by gene-cluster-ID
+  df12 <- merge(df11, df1, by = "gene_cluster_id")
+  
+  # write data frame
+  write.table(df12, paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/",group,"_pan_summary.txt"), sep = "\t", row.names = FALSE, quote = FALSE)
+  
+}
+
+species_group_gene_caller_binning <- function(group,focal_genome) {
+  
+  # load data frame
+  focal_df <- read.table(paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/",group,"_pan_summary.txt"), header = TRUE, sep = "\t")
+  
+  # For focal genome, filter by the genome ID, subset columns so that we have Bin, bin_name and gene_callers_id
+  # rename Bin to group_bin, bin_name to genus_bin 
+  # re-order so that gene_callers_id is first column
+  focal_df_2 <- focal_df %>% 
+    filter(genome_name == focal_genome) %>% 
+    select(c(gene_callers_id, Bin, bin_name)) %>% 
+    rename(group_bin = Bin, genus_bin = bin_name)
+  
+  
+  # re-code genus_bin values to reflect their status as genus
+  focal_df_3 <- focal_df_2 %>% 
+    mutate(genus_bin=recode(genus_bin, 'Genus_core'='Genus_core', 'Accessory'='Genus_Acc', 'Singletons' = 'Genus_Single'))
+  
+  # write data frame
+  write.table(focal_df_3, paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/",focal_genome,"gene_caller_ID_binning.txt"), sep = "\t", row.names = FALSE, quote = FALSE)
+  
+}
+
+```
+
+First determin gene cluster bins for species
+```{r run group-gene-cluster-binning function}
+library(janitor)
+library(dplyr)
+library(tidyr)
+library(reshape2)
+
+species_group_gene_cluster_binning("K_oralis") # running
+species_group_gene_cluster_binning("N_cinerea") # done; successful
+species_group_gene_cluster_binning("N_subflava") # done; successful
+
+
+```
+
+Next determine gene-caller bins for each species group; This data will go into the profile db later. 
+```{r run group-gene-caller-binning function}
+
+library(janitor)
+library(dplyr)
+library(tidyr)
+library(reshape2)
+
+species_group_gene_caller_binning("K_oralis", "K_oralis_str_ATCC_51147_id_GCA_000160435_1")
+species_group_gene_caller_binning("N_cinerea", "N_cinerea_str_CCUG_346_id_GCA_963394925_1")
+species_group_gene_caller_binning("N_subflava", "N_perflava_str_CCUG_17915_id_GCA_023472875_1")
+
+```
+
+
+Sort by rank order based on the proportion of samples in which the gene is detected (threshold >= 0.90); Run on local...
+
+```{r, eval=FALSE}
+
+library(dplyr)
+
+
+# Define a function to calculate the proportion of detected samples for a row
+prop_detected <- function(row) {
+  detected <- sum(row[-1] >= 0.90) # Count the number of samples where the value is >= 0.90
+  prop <- detected / (length(row) - 1) # Calculate the proportion
+  return(prop)
+}
+
+
+# Apply the function to each row of the data frame and add the results to a new column
+df <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION/K_oralis_str_ATCC_51147_id_GCA_000160435_1-gene_detection.txt-COMBO-30", header = TRUE, sep = "\t")
+df$prop_detected <- apply(df, 1, prop_detected)
+df_sorted <- df %>% 
+  select(gene_callers_id, prop_detected) %>% 
+  arrange(desc(prop_detected)) %>% 
+  select(gene_callers_id) 
+write.table(df_sorted, "/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION/K_oralis_str_ATCC_51147_id_GCA_000160435_1-gene_detection_items_order.txt", row.names = FALSE, quote = FALSE, sep = "\t", col.names = FALSE)
+
+
+df <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION/N_cinerea_str_CCUG_346_id_GCA_963394925_1-gene_detection.txt-COMBO-30", header = TRUE, sep = "\t")
+df$prop_detected <- apply(df, 1, prop_detected)
+df_sorted <- df %>% 
+  select(gene_callers_id, prop_detected) %>% 
+  arrange(desc(prop_detected)) %>% 
+  select(gene_callers_id) 
+write.table(df_sorted, "/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION/N_cinerea_str_CCUG_346_id_GCA_963394925_1-gene_detection_items_order.txt", row.names = FALSE, quote = FALSE, sep = "\t", col.names = FALSE)
+
+
+df <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION/N_perflava_str_CCUG_17915_id_GCA_023472875_1-gene_detection.txt-COMBO-30", header = TRUE, sep = "\t")
+df$prop_detected <- apply(df, 1, prop_detected)
+df_sorted <- df %>% 
+  select(gene_callers_id, prop_detected) %>% 
+  arrange(desc(prop_detected)) %>% 
+  select(gene_callers_id) 
+write.table(df_sorted, "/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION/N_perflava_str_CCUG_17915_id_GCA_023472875_1-gene_detection_items_order.txt", row.names = FALSE, quote = FALSE, sep = "\t", col.names = FALSE)
+
+
+```
+
+
+
+
+Color scheme: 
+
+Genus Core = f57676
+Genus Acc = 8fc1eb
+Genus Single = e6d200
+Species Core = 8f0606
+Species Acc/Single = 000000
+Ribosomal (not translated) = 15ff00
+d500ff TD
+00f245 KG
+fc0000 SUPP
+
+K_oralis_str_ATCC_51147_id_GCA_000160435_1
+
+```{bash, eval = FALSE}
+DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION
+PROFILE=$DIR/K_oralis_str_ATCC_51147_id_GCA_000160435_1_gene_level_detection_profile.db
+DETECTION=$DIR/K_oralis_str_ATCC_51147_id_GCA_000160435_1-gene_detection.txt-COMBO-30
+LAYERS=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/K_oralis_str_ATCC_51147_id_GCA_000160435_1gene_caller_ID_binning.txt
+ITEMS_ORDER=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION/K_oralis_str_ATCC_51147_id_GCA_000160435_1-gene_detection_items_order.txt
+
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+
+```
+
+
+N_cinerea_str_CCUG_346_id_GCA_963394925_1
+
+```{bash, eval = FALSE}
+DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION
+PROFILE=$DIR/N_cinerea_str_CCUG_346_id_GCA_963394925_1_gene_level_detection_profile.db
+DETECTION=$DIR/N_cinerea_str_CCUG_346_id_GCA_963394925_1-gene_detection.txt-COMBO-30
+LAYERS=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/N_cinerea_str_CCUG_346_id_GCA_963394925_1gene_caller_ID_binning.txt
+ITEMS_ORDER=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION/N_cinerea_str_CCUG_346_id_GCA_963394925_1-gene_detection_items_order.txt
+
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+
+```
+
+
+N_perflava_str_CCUG_17915_id_GCA_023472875_1
+
+```{bash, eval = FALSE}
+DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION
+PROFILE=$DIR/N_perflava_str_CCUG_17915_id_GCA_023472875_1_gene_level_detection_profile.db
+DETECTION=$DIR/N_perflava_str_CCUG_17915_id_GCA_023472875_1-gene_detection.txt-COMBO-30
+LAYERS=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/N_perflava_str_CCUG_17915_id_GCA_023472875_1gene_caller_ID_binning.txt
+ITEMS_ORDER=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION/N_perflava_str_CCUG_17915_id_GCA_023472875_1-gene_detection_items_order.txt
+
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+
+```
+
+# Version 2: 
+
+N_elongata_str_C2014003241_id_GCA_003044785_1 
+N_oralis_str_CCUG_26878_id_GCA_963394915_1
+K_sp_str_SNUBH_2017_id_GCA_028680565_1
+E_halliae_str_NML130454_id_GCA_001648475_1
+E_corrodens_str_CC92I_id_GCA_000504685_1
+K_denitrificans_str_GC77_id_GCA_900169325_1
+N_bacilliformis_str_ATCC_BAA_1200_id_GCA_000194925_1
+N_sicca_str_VK64_id_GCA_000260655_1
+
+N_subflava_str_CCUG_25198_id_GCA_963396245_1  ---- supposed SUPP specialist
+
+
+
+First, I want to choose a representative genome for each species group, or sub-species genetic clade, for N. mucosa and N subflava primarily, but also E. corrodens and N. elongata for which there are multiple genomes for. To choose the best representative genome we want one that recruits the most reads across the majority of its genome. In other words, we want genomes for which both depth of coverage and breadth of coverage is the highest for the greatest number of sample. To do this, we can set a breadth threshold of 50% for detection and a Q2Q3 depth threshold of 10X and then rank each genome by the number of samples in which the two criteria are met. Then choose the genome with the highest ranking. 
+
+```{r, eval = FALSE}
+
+# load species level classifcation IDs
+df_classes <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/DATA/Species_level_classification.txt", sep = "\t", header = TRUE)
+
+# load breadth results
+df_breadth <- read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Strain_level_updated_detection_data.csv", header = TRUE)
+
+# load Q2Q3 depth results
+df_depth <- read.csv("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/13_DETECTED_GENOMES/Strain_level_updated_Q2Q3_mean_coverage_data.csv", header = TRUE)
+
+# select relevant breadth and depth columns and merge data frames
+df_breadth_selected <- df_breadth %>% 
+  dplyr::select(layers, bins,site,value, detection_binary) %>% 
+  dplyr::rename(breadth = value)
+
+df_depth_selected <- df_depth %>% 
+  dplyr::select(layers, bins,site,value) %>% 
+  dplyr::rename(depth = value)
+
+merged_depth_breadth <- merge(df_depth_selected, df_breadth_selected, by = c("layers", "bins"))
+merged_depth_breadth_classes <- merge(merged_depth_breadth, df_classes, by.x = "bins", by.y = "Pangenome_ID", all.x = TRUE)
+merged_depth_breadth_classes <- merged_depth_breadth_classes %>% 
+  dplyr::rename(site = site.x) %>% 
+  dplyr::select(-c(site.y ))
+
+
+#E_corrodens <- merged_depth_breadth_classes %>% 
+  #dplyr::filter(Group_ID == "E_corrodens") %>% 
+  #dplyr::filter(site == "SUPP" | site == "TD" | site == "BM") %>% 
+
+  
+# Filter the data for the relevant sites
+filtered_data <- merged_depth_breadth_classes %>%
+  filter(site %in% c("SUPP", "TD", "KG"))
+
+# Apply the thresholds and count the number of samples meeting the criteria for each "bins" within each "Group_ID"
+ranked_data <- filtered_data %>%
+  group_by(Group_ID, bins) %>%
+  summarize(
+    samples_meeting_criteria = sum(breadth >= 0.50 & depth >= 10),
+    .groups = 'drop'
+  ) %>%
+  arrange(Group_ID, desc(samples_meeting_criteria))
+
+# Select the top "bins" for each "Group_ID"
+best_bins <- ranked_data %>%
+  group_by(Group_ID) %>% 
+  filter(samples_meeting_criteria > 0) %>% 
+  slice_max(samples_meeting_criteria, n = 1) %>%
+  ungroup()
+
+
+best_bins_IDs <- best_bins %>% select(bins) 
+
+write.table(best_bins_IDs, "/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION/best_bins_IDs.txt", row.names = FALSE, quote = FALSE, col.names = FALSE)
+
+
+```
+
+Group_ID
+<chr>
+bins
+<chr>
+samples_meeting_criteria
+<int>
+E_corrodens	E_corrodens_str_CC92I_id_GCA_000504685_1	1	
+E_halliae	E_halliae_str_NML130454_id_GCA_001648475_1	1	
+K_bonacorsii_oralis	K_oralis_str_ATCC_51147_id_GCA_000160435_1	73	
+K_denitrificans	K_denitrificans_str_GC77_id_GCA_900169325_1	17	
+K_sp_str_SNUBH_2017	K_sp_str_SNUBH_2017_id_GCA_028680565_1	15	
+N_bacilliformis	N_bacilliformis_str_ATCC_BAA_1200_id_GCA_000194925_1	12	
+N_cinerea	N_cinerea_str_C2014013859_id_GCA_003044825_1	1	
+N_elongata	N_elongata_str_M15910_id_GCA_003351685_1	10	
+N_mucosa_I	N_sicca_str_DE0367_id_GCA_007673275_1	12	
+N_mucosa_III	N_sicca_str_DE0493_id_GCA_007667125_1	5	
+N_mucosa_IV	N_mucosa_str_CCUG_431_id_GCA_963396235_1	2	
+N_mucosa_IV	N_sicca_str_C2007003584_id_GCA_003044425_1	2	
+N_mucosa_V	N_sicca_str_C2014002478_id_GCA_003044765_1	10	
+N_mucosa_VI	N_sicca_str_C2010005502_id_GCA_003044565_1	17	
+N_mucosa_VII	N_sicca_str_VK64_id_GCA_000260655_1	25	
+N_oralis	N_sp_str_F0314_id_GCA_005886145_1	21	
+N_sp_HMT_020	N_sp_HMT_020_str_F0370_id_GCA_000318235_2	1	
+N_subflava_I	N_subflava_str_UMB1050_id_GCA_030218065_1	6	
+N_subflava_II	N_subflava_str_C2008002238_id_GCA_003044845_1	2	
+N_subflava_II	N_subflava_str_C2011020199_id_GCA_003044965_1	2	
+N_subflava_III	N_flavescens_str_CD_NF1_id_GCA_001618015_1	7	
+N_subflava_IV	N_perflava_str_CCUG_17915_id_GCA_023472875_1	122	
+N_subflava_V	N_subflava_str_CCUG_25198_id_GCA_963396245_1	6	
+N_subflava_VII	N_sp_str_RH3002v2g_id_GCA_014596425_2	8	
+
+
+
+```{bash, eval = FALSE}
+
+scp -r /Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION/best_bins_IDs.txt jgiacomini@evol5.mbl.edu:/workspace/jmarkwelchlab/P_0003_Neisseriaceae/23_GENE_LEVEL_DETECTION/best_bins_IDs.txt
+
+```
+
+```{bash, eval = FALSE}
+
+clusterize -n 10 -l LOGS/Gene_level_data_for_radial_plots.log ./SCRIPTS/Gene_level_data_for_radial_plots.sh 
+
+```
+
+Send results to local...
+```{bash, eval = FALSE}
+
+scp -r jgiacomini@evol5.mbl.edu:/workspace/jmarkwelchlab/P_0003_Neisseriaceae/23_GENE_LEVEL_DETECTION /Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION_V2
+
+```
+
+Modify r functions
+```{r, eval = FALSE}
+
+species_group_gene_cluster_binning <- function(group) {
+  # load data
+  pan_summary_df <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/G_0213/SUMMARY/P_0003_Neisseriaceae_gene_clusters_summary_subset.txt", header = TRUE, sep = "\t", fill = TRUE)
+  pan_summary_df$genome_name <- as.factor(pan_summary_df$genome_name)
+  group_df <- read.table("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/DATA/Species_level_classification.txt", sep = "\t", header = TRUE)
+  
+  group_df <- group_df %>% 
+    dplyr::filter(Group_ID == group) %>% 
+    dplyr::select(Pangenome_ID) %>% 
+    dplyr::rename(Genome_ID = Pangenome_ID)
+  
+  # count number of rows in group collection list
+  n_group = nrow(group_df)
+  
+  # filter data by genome group
+  df1 <- pan_summary_df %>% 
+    filter(genome_name %in% group_df$Genome_ID) %>% 
+    droplevels()
+  df1$gene_callers_id <- as.factor(df1$gene_callers_id)
+  df1$gene_cluster_id <- as.factor(df1$gene_cluster_id)
+  
+  # Create wide df that tallys the count of gene-cluster_ID for each genome
+  df2 <- df1 %>%
+    # count number of rows for each combination of genome_name and gene_cluster_id
+    group_by(genome_name, gene_cluster_id) %>%
+    tally() %>%
+    # pivot the protocol names over the columns
+    pivot_wider(names_from=gene_cluster_id, values_from=n) %>%
+    # replace NA values in all columns with 0
+    mutate(across(everything(), .fns=~replace_na(., 0)))
+  
+  # remove first column
+  df4<-df2[,-1]
+  
+  # convert matrix to binary
+  df5 <- as.matrix((df4>0)+0)
+  
+  # convert matrix to data frame
+  df5 <- as.data.frame(df5)
+  
+  # add back first column
+  df5 <- cbind(df2$genome_name, df5)
+  
+  df6 <-df5 %>% 
+    rename(genome_name = 'df2$genome_name')
+  
+  # Add new row that is the sum of each column 
+  df7 <- df6 %>%
+    adorn_totals("row")
+  
+  # drop column 1
+  df8 <- df7 %>%
+    select(-c(genome_name))
+  
+  #drop rows (only keep last row  that contains sum total for each col)
+  df9 <- df8[-c(1:n_group), ]
+  
+  #transpose
+  df10 <- df9 %>% 
+    melt() %>% 
+    rename(gene_cluster_id = variable, sum = value)
+  
+  # add col for bin
+  df11 <- df10 %>% 
+    mutate(Bin = case_when(sum == n_group ~ paste0(group,"_Core"),
+                           sum > 1 & sum < n_group ~ paste0(group,"_Acc"),
+                           sum == 1 ~ paste0(group,"_Single")))
+  
+  # merge with group_pan_summary_df (df1) by gene-cluster-ID
+  df12 <- merge(df11, df1, by = "gene_cluster_id")
+  
+  # write data frame
+  write.table(df12, paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/",group,"_pan_summary.txt"), sep = "\t", row.names = FALSE, quote = FALSE)
+  
+}
+
+species_group_gene_caller_binning <- function(group,focal_genome) {
+  
+  # load data frame
+  focal_df <- read.table(paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/",group,"_pan_summary.txt"), header = TRUE, sep = "\t")
+  
+  # For focal genome, filter by the genome ID, subset columns so that we have Bin, bin_name and gene_callers_id
+  # rename Bin to group_bin, bin_name to genus_bin 
+  # re-order so that gene_callers_id is first column
+  focal_df_2 <- focal_df %>% 
+    filter(genome_name == focal_genome) %>% 
+    select(c(gene_callers_id, Bin, bin_name)) %>% 
+    rename(group_bin = Bin, genus_bin = bin_name)
+  
+  
+  # re-code genus_bin values to reflect their status as genus
+  focal_df_3 <- focal_df_2 %>% 
+    mutate(genus_bin=recode(genus_bin, 'Genus_core'='Genus_core', 'Accessory'='Genus_Acc', 'Singletons' = 'Genus_Single'))
+  
+  # write data frame
+  write.table(focal_df_3, paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/",focal_genome,"gene_caller_ID_binning.txt"), sep = "\t", row.names = FALSE, quote = FALSE)
+  
+}
+
+# Define a function to calculate the proportion of detected samples for a row
+prop_detected <- function(row) {
+  detected <- sum(row[-1] >= 0.90) # Count the number of samples where the value is >= 0.90
+  prop <- detected / (length(row) - 1) # Calculate the proportion
+  return(prop)
+}
+
+```
+
+
+1. First determin gene cluster bins for species
+2. Then determine gene-caller bins for each species group; This data will go into the profile db later. 
+3. Then sort by rank order based on the proportion of samples in which the gene is detected (threshold >= 0.90) and save items order file
+
+```{r, eval = FALSE}
+library(janitor)
+library(dplyr)
+library(tidyr)
+library(reshape2)
+
+for (i in 1:nrow(as.data.frame(best_bins))) {
+  
+  species <- as.data.frame(best_bins)[i, 1]
+  pangenome_ID <- as.data.frame(best_bins)[i, 2] 
+  
+  species_group_gene_cluster_binning(species) 
+  species_group_gene_caller_binning(species, pangenome_ID)
+
+  df <- read.table(paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION_V2/",pangenome_ID,"-gene_detection.txt-COMBO-30"), header = TRUE, sep = "\t")
+  df$prop_detected <- apply(df, 1, prop_detected)
+  df_sorted <- df %>% 
+    select(gene_callers_id, prop_detected) %>% 
+    arrange(desc(prop_detected)) %>% 
+    select(gene_callers_id) 
+  write.table(df_sorted, paste0("/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION_V2/",pangenome_ID,"-gene_detection_items_order.txt"), row.names = FALSE, quote = FALSE, sep = "\t", col.names = FALSE)
+  
+  
+}
+
+```
+
+
+Color schema: 
+
+Genus Core = f57676
+Genus Acc = 8fc1eb
+Genus Single = e6d200
+Species Core = 8f0606
+Species Acc/Single = 000000
+Ribosomal (not translated) = 15ff00
+d500ff TD
+00f245 KG
+fc0000 SUPP
+
+N_elongata_str_M15910_id_GCA_003351685_1
+```{bash, eval = FALSE}
+DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION_V2
+PROFILE=$DIR/N_elongata_str_M15910_id_GCA_003351685_1_gene_level_detection_profile.db
+DETECTION=$DIR/N_elongata_str_M15910_id_GCA_003351685_1-gene_detection.txt-COMBO-30
+LAYERS=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/N_elongata_str_M15910_id_GCA_003351685_1gene_caller_ID_binning.txt
+ITEMS_ORDER=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION_V2/N_elongata_str_M15910_id_GCA_003351685_1-gene_detection_items_order.txt
+
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                 
+
+```
+
+E_corrodens_str_CC92I_id_GCA_000504685_1
+```{bash, eval = FALSE}
+PROFILE=$DIR/E_corrodens_str_CC92I_id_GCA_000504685_1_gene_level_detection_profile.db
+DETECTION=$DIR/E_corrodens_str_CC92I_id_GCA_000504685_1-gene_detection.txt-COMBO-30
+LAYERS=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/E_corrodens_str_CC92I_id_GCA_000504685_1gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/E_corrodens_str_CC92I_id_GCA_000504685_1-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+E_halliae_str_NML130454_id_GCA_001648475_1
+```{bash, eval = FALSE}
+PROFILE=$DIR/E_halliae_str_NML130454_id_GCA_001648475_1_gene_level_detection_profile.db
+DETECTION=$DIR/E_halliae_str_NML130454_id_GCA_001648475_1-gene_detection.txt-COMBO-30
+LAYERS=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/E_halliae_str_NML130454_id_GCA_001648475_1gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/E_halliae_str_NML130454_id_GCA_001648475_1-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+K_denitrificans_str_GC77_id_GCA_900169325_1
+```{bash, eval = FALSE}
+PROFILE=$DIR/K_denitrificans_str_GC77_id_GCA_900169325_1_gene_level_detection_profile.db
+DETECTION=$DIR/K_denitrificans_str_GC77_id_GCA_900169325_1-gene_detection.txt-COMBO-30
+LAYERS=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/K_denitrificans_str_GC77_id_GCA_900169325_1gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/K_denitrificans_str_GC77_id_GCA_900169325_1-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+K_sp_str_SNUBH_2017_id_GCA_028680565_1
+```{bash, eval = FALSE}
+PROFILE=$DIR/K_sp_str_SNUBH_2017_id_GCA_028680565_1_gene_level_detection_profile.db
+DETECTION=$DIR/K_sp_str_SNUBH_2017_id_GCA_028680565_1-gene_detection.txt-COMBO-30
+LAYERS=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME/K_sp_str_SNUBH_2017_id_GCA_028680565_1gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/K_sp_str_SNUBH_2017_id_GCA_028680565_1-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+N_bacilliformis_str_ATCC_BAA_1200_id_GCA_000194925_1
+```{bash, eval = FALSE}
+
+PAN_ID=N_bacilliformis_str_ATCC_BAA_1200_id_GCA_000194925_1
+
+PROFILE=$DIR/${PAN_ID}_gene_level_detection_profile.db
+DETECTION=$DIR/${PAN_ID}-gene_detection.txt-COMBO-30
+LAYERS_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME
+LAYERS=$LAYERS_DIR/${PAN_ID}gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/${PAN_ID}-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+N_sp_str_F0314_id_GCA_005886145_1
+```{bash, eval = FALSE}
+
+PAN_ID=N_sp_str_F0314_id_GCA_005886145_1
+
+PROFILE=$DIR/${PAN_ID}_gene_level_detection_profile.db
+DETECTION=$DIR/${PAN_ID}-gene_detection.txt-COMBO-30
+LAYERS_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME
+LAYERS=$LAYERS_DIR/${PAN_ID}gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/${PAN_ID}-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+N_sp_HMT_020_str_F0370_id_GCA_000318235_2
+```{bash, eval = FALSE}
+
+PAN_ID=N_sp_HMT_020_str_F0370_id_GCA_000318235_2
+
+PROFILE=$DIR/${PAN_ID}_gene_level_detection_profile.db
+DETECTION=$DIR/${PAN_ID}-gene_detection.txt-COMBO-30
+LAYERS_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME
+LAYERS=$LAYERS_DIR/${PAN_ID}gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/${PAN_ID}-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+N_cinerea_str_C2014013859_id_GCA_003044825_1
+```{bash, eval = FALSE}
+
+PAN_ID=N_cinerea_str_C2014013859_id_GCA_003044825_1
+
+PROFILE=$DIR/${PAN_ID}_gene_level_detection_profile.db
+DETECTION=$DIR/${PAN_ID}-gene_detection.txt-COMBO-30
+LAYERS_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME
+LAYERS=$LAYERS_DIR/${PAN_ID}gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/${PAN_ID}-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+
+N_subflava_I
+N_subflava_str_UMB1050_id_GCA_030218065_1
+```{bash, eval = FALSE}
+
+PAN_ID=N_subflava_str_UMB1050_id_GCA_030218065_1
+
+PROFILE=$DIR/${PAN_ID}_gene_level_detection_profile.db
+DETECTION=$DIR/${PAN_ID}-gene_detection.txt-COMBO-30
+LAYERS_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME
+LAYERS=$LAYERS_DIR/${PAN_ID}gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/${PAN_ID}-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+N_subflava_II
+N_subflava_str_C2011020199_id_GCA_003044965_1
+N_subflava_II_N_subflava_str_C2011020199_id_GCA_003044965_1
+```{bash, eval = FALSE}
+
+PAN_ID=N_subflava_str_C2011020199_id_GCA_003044965_1
+
+PROFILE=$DIR/${PAN_ID}_gene_level_detection_profile.db
+DETECTION=$DIR/${PAN_ID}-gene_detection.txt-COMBO-30
+LAYERS_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME
+LAYERS=$LAYERS_DIR/${PAN_ID}gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/${PAN_ID}-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+N_subflava_III
+N_flavescens_str_CD_NF1_id_GCA_001618015_1
+N_subflava_III_N_flavescens_str_CD_NF1_id_GCA_001618015_1
+```{bash, eval = FALSE}
+
+PAN_ID=N_flavescens_str_CD_NF1_id_GCA_001618015_1
+
+PROFILE=$DIR/${PAN_ID}_gene_level_detection_profile.db
+DETECTION=$DIR/${PAN_ID}-gene_detection.txt-COMBO-30
+LAYERS_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME
+LAYERS=$LAYERS_DIR/${PAN_ID}gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/${PAN_ID}-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+
+N_subflava_IV
+N_perflava_str_CCUG_17915_id_GCA_023472875_1
+N_subflava_IV_N_perflava_str_CCUG_17915_id_GCA_023472875_1
+```{bash, eval = FALSE}
+DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION_V2
+PAN_ID=N_perflava_str_CCUG_17915_id_GCA_023472875_1
+
+PROFILE=$DIR/${PAN_ID}_gene_level_detection_profile.db
+DETECTION=$DIR/${PAN_ID}-gene_detection.txt-COMBO-30
+LAYERS_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME
+LAYERS=$LAYERS_DIR/${PAN_ID}gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/${PAN_ID}-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+N_subflava_V
+N_subflava_str_CCUG_25198_id_GCA_963396245_1
+N_subflava_V_N_subflava_str_CCUG_25198_id_GCA_963396245_1
+```{bash, eval = FALSE}
+DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION_V2
+PAN_ID=N_subflava_str_CCUG_25198_id_GCA_963396245_1
+
+PROFILE=$DIR/${PAN_ID}_gene_level_detection_profile.db
+DETECTION=$DIR/${PAN_ID}-gene_detection.txt-COMBO-30
+LAYERS_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME
+LAYERS=$LAYERS_DIR/${PAN_ID}gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/${PAN_ID}-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+
+
+
+N_subflava_VII
+N_sp_str_RH3002v2g_id_GCA_014596425_2
+N_subflava_VII_N_sp_str_RH3002v2g_id_GCA_014596425_2
+```{bash, eval = FALSE}
+DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION_V2
+PAN_ID=N_sp_str_RH3002v2g_id_GCA_014596425_2
+
+PROFILE=$DIR/${PAN_ID}_gene_level_detection_profile.db
+DETECTION=$DIR/${PAN_ID}-gene_detection.txt-COMBO-30
+LAYERS_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME
+LAYERS=$LAYERS_DIR/${PAN_ID}gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/${PAN_ID}-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+
+*Need to get -gene_detection.txt-COMBO-30 file* 
+N_subflava_VIII
+N_sp_str_HMSC061H08_id_GCA_001836795_1
+N_subflava_VIII_N_sp_str_HMSC061H08_id_GCA_001836795_1
+```{bash, eval = FALSE}
+DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION_V2
+PAN_ID=N_sp_str_HMSC061H08_id_GCA_001836795_1
+
+PROFILE=$DIR/${PAN_ID}_gene_level_detection_profile.db
+DETECTION=$DIR/${PAN_ID}-gene_detection.txt-COMBO-30
+LAYERS_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME
+LAYERS=$LAYERS_DIR/${PAN_ID}gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/${PAN_ID}-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+
+N_mucosa_I	N_sicca_str_DE0367_id_GCA_007673275_1	
+N_mucosa_II	N_sicca_str_4320_id_GCA_000193735_2
+N_mucosa_III	N_sicca_str_DE0493_id_GCA_007667125_1
+N_mucosa_IV	N_mucosa_str_CCUG_431_id_GCA_963396235_1
+N_mucosa_V	N_sicca_str_C2014002478_id_GCA_003044765_1	
+N_mucosa_VI	N_sicca_str_C2010005502_id_GCA_003044565_1	
+
+N_mucosa_VII	N_sicca_str_VK64_id_GCA_000260655_1	
+```{bash, eval = FALSE}
+DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/23_GENE_LEVEL_DETECTION_V2
+PAN_ID=N_sicca_str_VK64_id_GCA_000260655_1
+
+PROFILE=$DIR/${PAN_ID}_gene_level_detection_profile.db
+DETECTION=$DIR/${PAN_ID}-gene_detection.txt-COMBO-30
+LAYERS_DIR=/Users/home/SPECIES_LEVEL_PANGENOMES/Neisseriaceae/09_PANGENOME
+LAYERS=$LAYERS_DIR/${PAN_ID}gene_caller_ID_binning.txt
+ITEMS_ORDER=$DIR/${PAN_ID}-gene_detection_items_order.txt
+
+# run display to create the db, but close so we can import the binning collection
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only
+                 
+# import gene_caller_binning file to profile db
+anvi-import-misc-data -p $PROFILE -t items $LAYERS              
+
+# run display again to make final edits
+anvi-interactive -p $PROFILE -d $DETECTION --manual \
+                 -I 127.0.0.1 \
+                 -P 8901 \
+                 --server-only \
+                 --items-order $ITEMS_ORDER
+                
+```
+
+
+
+
+
+
+*Need to get -gene_detection.txt-COMBO-30 file* 
+
+E. exigua E_sp_str_NML96_A_049_id_GCA_001648495_1
+K. negevensis K_negevensis_str_CC443_id_GCA_030180945_1
+K. kingae K_kingae_str_ATCC_23330_id_GCA_900111845_1
+N. mucosa II N_sicca_str_4320_id_GCA_000193735_2
+S. muelleri S_muelleri_str_DSM_2579_id_GCA_020162275_1
+N_subflava_VIII N_sp_str_HMSC061H08_id_GCA_001836795_1
+
