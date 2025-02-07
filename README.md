@@ -1,9 +1,23 @@
----
-title: "Neisseriaceae Metapangenomics in the Human Oral Cavity"
-author: "J. J. Giacomini"
-date: "2024-04-25"
-output: html_document
----
+Title: Spatial ecology of the Neisseriaceae family in the human oral cavity
+
+The human oral microbiome is a diverse ecosystem in which bacterial species have evolved to occupy specific niches within the oral cavity. The Neisseriaceae family, which includes human oral species in the genera Neisseria, Eikenella, Kingella, and Simonsiella, plays a significant role in both commensal and pathogenic relationships. In this study, we investigate the distribution and functional adaptations of Neisseriaceae species across oral habitats, focusing on their site tropisms and ecological roles. We employed a metapangenomics approach in which a curated set of reference genomes representing Neisseriaceae diversity was used for competitive mapping of metagenomic reads. 
+
+The following is a compilation of the code used in this study
+
+Authors: Jonathan J. Giacomini 1,4, Julian Torres-Morales 1, Floyd E. Dewhirst 1,2, Gary G. Borisy 1, Jessica L. Mark Welch 1,3 
+
+1 ADA Forsyth Institute, Cambridge, MA 02142, USA
+2 Harvard School of Dental Medicine, Boston, MA 02115, USA. 
+3 Marine Biological Laboratory, Woods Hole, MA 02543, USA
+4 Corresponding author email Jonjgiacomini@gmail.com
+
+
+
+
+
+
+
+
 
 # Load modules on Barhal
 
